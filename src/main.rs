@@ -1,14 +1,11 @@
 use anyhow::Result;
 use anyhow::{anyhow, bail, Context as AnyhowContext, Error};
 use fs_extra::dir::CopyOptions;
-use lazy_static::lazy_static;
+
 use poise::futures_util::StreamExt;
-use poise::serenity_prelude::{
-    EmojiId, GatewayIntents, Message, MessageReaction, Reaction, ReactionType, StatusCode, User,
-    UserId,
-};
+use poise::serenity_prelude::{EmojiId, GatewayIntents, Message, ReactionType, User, UserId};
+use poise::PrefixFrameworkOptions;
 use poise::{serenity_prelude as serenity, Modal};
-use poise::{FrameworkError, PrefixFrameworkOptions};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -120,10 +117,10 @@ async fn ensure_user_avatar<'a>(state: &'a mut ArchivalState, user: &mut User) -
 
         e.insert(file_path.strip_prefix(&state.root_dir)?.to_path_buf());
     }
-    let avatar = (state
+    let avatar = state
         .avatars
         .get(&user.id)
-        .expect("Failed to retrieve avatar reference"));
+        .expect("Failed to retrieve avatar reference");
     user.avatar = Some(
         avatar
             .to_str()
@@ -147,26 +144,35 @@ async fn ensure_emoji<'a>(
             ReactionType::Unicode(emoji) => {
                 println!("{emoji}");
                 let asset = PngTwemojiAsset::from_emoji(emoji)
-                    .ok_or_else(|| anyhow!("Unknown emoji {emoji}"))?;
-                let file_name = state.assets_dir.join(format!(
-                    "{}.png",
-                    asset
-                        .label
-                        .ok_or_else(|| anyhow!("Failed to get emoji label"))?
-                ));
-                File::create(&file_name)
-                    .await?
-                    .write_all(asset.data.0)
-                    .await?;
-                e.insert(file_name.strip_prefix(&state.root_dir)?.to_path_buf());
+                    .or_else(|| PngTwemojiAsset::from_emoji(&emoji[..1]));
+                if let Some(asset) = asset {
+                    let file_name = state.assets_dir.join(format!(
+                        "{}.png",
+                        asset
+                            .label
+                            .ok_or_else(|| anyhow!("Failed to get emoji label"))?
+                    ));
+                    File::create(&file_name)
+                        .await?
+                        .write_all(asset.data.0)
+                        .await?;
+                    e.insert(file_name.strip_prefix(&state.root_dir)?.to_path_buf());
+                } else {
+                    let file_name = state.assets_dir.join("broken_emoji.png");
+                    File::create(&file_name)
+                        .await?
+                        .write_all(include_bytes!("404.png"))
+                        .await?;
+                    e.insert(file_name.strip_prefix(&state.root_dir)?.to_path_buf());
+                }
             }
             other => bail!("Unsupported emoji type: {other:?}"),
         };
     }
-    let emoji = (state
+    let emoji = state
         .emojis
         .get(&reaction)
-        .expect("Failed to retrieve emoji reference"));
+        .expect("Failed to retrieve emoji reference");
     Ok(emoji)
 }
 
@@ -273,7 +279,7 @@ async fn handle_archive(ctx: Context<'_>) -> Result<()> {
     }
 
     let response = ctx
-        .send(|msg| msg.content("Archival in progress").ephemeral(true))
+        .send(|msg| msg.content("Archival in progress").ephemeral(false))
         .await?;
 
     let mut state = ArchivalState::create().await?;
@@ -284,20 +290,24 @@ async fn handle_archive(ctx: Context<'_>) -> Result<()> {
     let mut last_count = 0;
     while let Some(message) = messages.next().await {
         let mut message = message?;
-        process_message(&mut state, &mut message)
-            .await
-            .with_context(|| format!("processing message {}", message.id))?;
         if (last.elapsed().as_secs() >= 1 && state.processed_count > last_count)
-            && (last.elapsed().as_secs() >= 5 || state.processed_count - last_count >= 10)
+            && (last.elapsed().as_secs() >= 2 || state.processed_count - last_count >= 10)
         {
             last = Instant::now();
             last_count = state.processed_count;
             response
                 .edit(ctx, |msg| {
-                    msg.content(format!("Messages archived: {}", state.processed_count))
+                    msg.content(format!(
+                        "Messages archived: {}\nCurrently processing: {}",
+                        state.processed_count,
+                        message.link()
+                    ))
                 })
                 .await?;
         }
+        process_message(&mut state, &mut message)
+            .await
+            .with_context(|| format!("processing message {}", message.id))?;
     }
 
     state.finalize().await?;
