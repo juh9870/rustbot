@@ -1,20 +1,28 @@
 use anyhow::Result;
 use anyhow::{anyhow, bail, Context as AnyhowContext, Error};
-use fs_extra::dir::CopyOptions;
 
+use crate::utils::{archive_directory, upload_file};
+use pluralizer::pluralize;
 use poise::futures_util::StreamExt;
-use poise::serenity_prelude::{EmojiId, GatewayIntents, Message, ReactionType, User, UserId};
+use poise::serenity_prelude::{
+    ButtonStyle, ComponentInteractionCollectorBuilder, EmojiId, GatewayIntents,
+    InteractionResponseType, Message, ReactionType, Timestamp, User, UserId,
+};
 use poise::PrefixFrameworkOptions;
 use poise::{serenity_prelude as serenity, Modal};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use tempdir::TempDir;
+use tempfile::{tempdir, NamedTempFile, TempDir};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::time::Instant;
 use twemoji_assets::png::PngTwemojiAsset;
+
+mod messages_iter;
+mod utils;
+mod wiping;
 
 struct Data {}
 
@@ -36,7 +44,7 @@ async fn confirm(ctx: Context<'_>) -> Result<bool> {
             .unwrap_or("".to_string()),
         Context::Prefix(ctx) => {
             ctx.say("Are you sure you want to archive and wipe a channel?\nInput \"archive\" to confirm. This cannot be undone.").await?;
-            let response = serenity::collector::MessageCollectorBuilder::new(&ctx.serenity_context)
+            let response = serenity::collector::MessageCollectorBuilder::new(ctx.serenity_context)
                 .author_id(ctx.author().id)
                 .channel_id(ctx.channel_id())
                 .collect_limit(1)
@@ -64,7 +72,7 @@ struct ArchivalState {
 
 impl ArchivalState {
     async fn create() -> Result<Self> {
-        let dir = TempDir::new("")?;
+        let dir = tempdir()?;
         let file = File::create(dir.path().join("messages.json")).await?;
         let assets_dir = dir.path().join("assets");
         tokio::fs::create_dir(&assets_dir).await?;
@@ -85,7 +93,7 @@ impl ArchivalState {
 }
 
 fn get_extension_from_url(file_url: &str) -> Result<String> {
-    let parsed = url::Url::parse(&file_url)?;
+    let parsed = url::Url::parse(file_url)?;
     Path::extension(parsed.path().as_ref())
         .and_then(|e| e.to_str())
         .map(|e| e.to_string())
@@ -171,7 +179,7 @@ async fn ensure_emoji<'a>(
     }
     let emoji = state
         .emojis
-        .get(&reaction)
+        .get(reaction)
         .expect("Failed to retrieve emoji reference");
     Ok(emoji)
 }
@@ -312,15 +320,113 @@ async fn handle_archive(ctx: Context<'_>) -> Result<()> {
 
     state.finalize().await?;
 
-    fs_extra::move_items(
-        &[state.root_dir.path()],
-        PathBuf::from("."),
-        &CopyOptions::default(),
-    )?;
+    response
+        .edit(ctx, |msg| msg.content("Archiving files"))
+        .await?;
+
+    let mut file = NamedTempFile::new()?;
+    archive_directory(state.root_dir.path(), file.as_file_mut()).context("zipping files")?;
+    let size = file.as_file().metadata()?.len();
 
     response
-        .edit(ctx, |msg| msg.content("Channel archived"))
+        .edit(ctx, |msg| msg.content("Uploading archive"))
         .await?;
+
+    let filename = "archive.zip";
+
+    let timeout = 60 * 15;
+
+    let edit_prefix = format!(
+        "Archival successful. Messages deletion will automatically be canceled <t:{}:R>",
+        Timestamp::now().unix_timestamp() + timeout
+    );
+
+    // Less than 25 MB limit to be safe
+    const SIZE_LIMIT: u64 = 1000 * 1000 * 24;
+    let mut latest_message = if size < SIZE_LIMIT {
+        let tokio_file = File::open(file.path()).await?;
+        ctx.channel_id()
+            .send_files(
+                ctx.serenity_context(),
+                [(&tokio_file, "archive.zip")],
+                |msg| msg.content(edit_prefix),
+            )
+            .await
+            .context("uploading archive to discord")?
+    } else {
+        let uploaded = upload_file(file.path(), filename.to_string())
+            .await
+            .context("uploading archive to file.io")?;
+        response
+            .edit(ctx, |msg| {
+                msg.content(format!(
+                    "{edit_prefix}\nDownload archive at {}\nFile will expire <t:{}:R>, or after {}",
+                    uploaded.link,
+                    uploaded.expires.unix_timestamp(),
+                    pluralize("downloads", uploaded.max_downloads, true)
+                ))
+            })
+            .await?;
+        response.into_message().await?
+    };
+
+    latest_message
+        .edit(ctx, |msg| {
+            msg.components(|c| {
+                c.create_action_row(|row| {
+                    row.create_button(|btn| {
+                        btn.label("Wipe archived messages")
+                            .style(ButtonStyle::Danger)
+                            .custom_id("delete")
+                    })
+                    .create_button(|btn| {
+                        btn.label("Cancel")
+                            .style(ButtonStyle::Primary)
+                            .custom_id("cancel")
+                    })
+                })
+            })
+        })
+        .await?;
+
+    let mut builder = ComponentInteractionCollectorBuilder::new(ctx)
+        .message_id(latest_message.id)
+        .author_id(ctx.author().id)
+        .collect_limit(1)
+        .timeout(Duration::from_secs(timeout as u64))
+        .build();
+
+    let delete = match builder.next().await {
+        None => false,
+        Some(interaction) => {
+            interaction
+                .create_interaction_response(ctx.serenity_context(), |r| {
+                    r.kind(InteractionResponseType::DeferredUpdateMessage)
+                })
+                .await?;
+            interaction.data.custom_id == "delete"
+        }
+    };
+
+    if delete {
+        bail!("NOT IMPLEMENTED!");
+    } else {
+        latest_message
+            .edit(ctx, |msg| {
+                msg.components(|c| {
+                    c.create_action_row(|r| {
+                        r.create_button(|btn| {
+                            btn.label("Wiping canceled")
+                                .disabled(true)
+                                .custom_id("canceled")
+                        })
+                    })
+                })
+            })
+            .await?;
+    }
+
+    file.close()?;
 
     Ok(())
 }
