@@ -1,6 +1,42 @@
 use futures::Stream;
 use poise::serenity_prelude::*;
 
+#[derive(Copy, Clone, Debug)]
+pub struct MessagesRange {
+    pub before: Option<MessageId>,
+    pub after: Option<MessageId>,
+}
+
+impl MessagesRange {
+    pub async fn snapshot_for_channel<H: AsRef<Http>>(
+        &self,
+        http: H,
+        channel: ChannelId,
+    ) -> anyhow::Result<MessagesRange> {
+        if self.before.is_some() {
+            return Ok(*self);
+        }
+
+        let last_msg = channel
+            .messages(http, |b| b.limit(1))
+            .await?
+            .first()
+            .map(|e| e.id);
+        let mut cloned = *self;
+
+        cloned.before = last_msg;
+
+        Ok(cloned)
+    }
+
+    pub fn unbounded() -> Self {
+        Self {
+            before: None,
+            after: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct SmartMessagesIter<H: AsRef<Http>> {
     http: H,
@@ -8,16 +44,18 @@ pub struct SmartMessagesIter<H: AsRef<Http>> {
     buffer: Vec<Message>,
     before: Option<MessageId>,
     tried_fetch: bool,
+    range: MessagesRange,
 }
 
 impl<H: AsRef<Http>> SmartMessagesIter<H> {
-    fn new(http: H, channel_id: ChannelId, before: Option<MessageId>) -> SmartMessagesIter<H> {
+    fn new(http: H, channel_id: ChannelId, range: MessagesRange) -> SmartMessagesIter<H> {
         SmartMessagesIter {
             http,
             channel_id,
             buffer: Vec::new(),
-            before,
+            before: range.before,
             tried_fetch: false,
+            range,
         }
     }
 
@@ -50,7 +88,10 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
                     b.before(before);
                 }
 
-                b.limit(grab_size)
+                match self.range.after {
+                    None => b.limit(grab_size),
+                    Some(after) => b.limit(grab_size).after(after),
+                }
             })
             .await?;
 
@@ -83,7 +124,7 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
     /// use serenity::futures::StreamExt;
     /// use serenity::model::channel::MessagesIter;
     ///
-    /// let mut messages = MessagesIter::<Http>::stream(&ctx, channel_id).boxed();
+    /// let mut messages = SmartMessagesIter::<Http>::stream(&ctx, channel_id).boxed();
     /// while let Some(message_result) = messages.next().await {
     ///     match message_result {
     ///         Ok(message) => println!("{} said \"{}\"", message.author.name, message.content,),
@@ -95,9 +136,9 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
     pub fn stream(
         http: impl AsRef<Http>,
         channel_id: ChannelId,
-        before: Option<MessageId>,
+        range: MessagesRange,
     ) -> impl Stream<Item = Result<Message>> {
-        let init_state = SmartMessagesIter::new(http, channel_id, before);
+        let init_state = SmartMessagesIter::new(http, channel_id, range);
 
         futures::stream::unfold(init_state, |mut state| async {
             if state.buffer.is_empty() && state.before.is_some() || !state.tried_fetch {
@@ -110,4 +151,12 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
             state.buffer.pop().map(|entry| (Ok(entry), state))
         })
     }
+}
+
+pub fn smart_messages_iter<H: AsRef<Http>>(
+    http: H,
+    channel_id: ChannelId,
+    range: MessagesRange,
+) -> impl Stream<Item = Result<Message>> {
+    SmartMessagesIter::<H>::stream(http, channel_id, range)
 }

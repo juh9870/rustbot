@@ -1,13 +1,16 @@
 use crate::archival::{archive_messages, ArchiveData};
-use anyhow::Result;
-use anyhow::{bail, Error};
+use anyhow::Error;
+use anyhow::{Context as AnyhowContext, Result};
 use futures::TryStreamExt;
 use poise::serenity_prelude::{ButtonStyle, Timestamp, UserId};
 use std::time::Duration;
+use tokio::time::sleep;
 use utils::command_handler_wrapper;
 use utils::component_tools::{clear_components, set_dummy_text_component};
 use utils::confirmations::{confirm_buttons, BtnConfirmOptions};
+use utils::messages_iter::{smart_messages_iter, MessagesRange};
 use utils::web_files::messaged::upload_file_and_message;
+use wiper::wiping::wipe_messages;
 
 pub mod archival;
 
@@ -34,11 +37,16 @@ macro_rules! archive_command {
 }
 
 pub async fn archive<T: Sync + Send>(ctx: Context<'_, T>, archive_name: String) -> Result<()> {
-    command_handler_wrapper!(handle_archive(ctx, archive_name))
+    command_handler_wrapper!(handle_archive(
+        ctx,
+        MessagesRange::unbounded(),
+        archive_name,
+    ))
 }
 
 async fn handle_archive<T: Sync + Send>(
     ctx: Context<'_, T>,
+    mut messages_range: MessagesRange,
     mut archive_name: String,
 ) -> Result<()> {
     let mut reply = ctx
@@ -46,6 +54,7 @@ async fn handle_archive<T: Sync + Send>(
         .await?
         .into_message()
         .await?;
+
     let confirmed = confirm_buttons(
         ctx,
         &mut reply,
@@ -59,6 +68,15 @@ async fn handle_archive<T: Sync + Send>(
     )
     .await?
     .bool();
+
+    if messages_range.before.is_none() {
+        if let Context::Prefix(ctx) = ctx {
+            messages_range.before = Some(ctx.msg.id);
+        } else {
+            messages_range.before = Some(reply.id);
+        }
+    }
+
     clear_components(ctx, &mut reply).await?;
     if !confirmed {
         reply
@@ -73,7 +91,7 @@ async fn handle_archive<T: Sync + Send>(
     let response_id = reply.id;
 
     let ArchiveData { file, time_range } = archive_messages(
-        ctx.channel_id().messages_iter(&ctx).map_err(|e| e.into()),
+        smart_messages_iter(ctx, ctx.channel_id(), messages_range).map_err(|e| e.into()),
         |status| async {
             ctx.channel_id()
                 .edit_message(ctx, response_id, |msg| msg.content(status))
@@ -87,7 +105,7 @@ async fn handle_archive<T: Sync + Send>(
         let start_day = time_range.start.date_naive();
         let end_day = time_range.end.date_naive();
         if start_day == end_day {
-            end_day.format("%y-%m-%d").to_string()
+            end_day.format("%Y-%m-%d").to_string()
         } else {
             format!(
                 "{} to {}",
@@ -150,9 +168,35 @@ async fn handle_archive<T: Sync + Send>(
 
     if confirmed {
         clear_components(ctx, &mut latest_message).await?;
-        bail!("NOT IMPLEMENTED!");
+
+        let wiper_status = ctx
+            .say("Initializing wiper")
+            .await?
+            .into_message()
+            .await?
+            .id;
+        let channel = ctx.channel_id();
+
+        wipe_messages(
+            ctx,
+            smart_messages_iter(ctx, ctx.channel_id(), messages_range).map_err(|e| e.into()),
+            |status, is_due| async move {
+                if is_due {
+                    channel
+                        .edit_message(ctx, wiper_status, |msg| msg.content(status))
+                        .await?;
+                }
+                Ok(())
+            },
+        )
+        .await
+        .context("wiping")?;
+
+        sleep(Duration::from_secs(15)).await;
+
+        let _ = channel.delete_message(ctx, wiper_status).await;
     } else {
-        set_dummy_text_component(ctx, &mut latest_message, "Wiping canceled").await?
+        set_dummy_text_component(ctx, &mut latest_message, "Wiping canceled").await?;
     }
 
     file.close()?;

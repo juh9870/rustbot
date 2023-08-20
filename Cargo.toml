@@ -3,6 +3,7 @@ members = [
     "utils",
     "archival",
     "eh_bot",
+    "wiper",
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
