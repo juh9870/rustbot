@@ -50,7 +50,7 @@ async fn handle_archive<T: Sync + Send>(
     mut archive_name: String,
 ) -> Result<()> {
     let mut reply = ctx
-        .say("Awaiting confirmation")
+        .say("Are you sure you want to archive this channel?")
         .await?
         .into_message()
         .await?;
@@ -91,6 +91,7 @@ async fn handle_archive<T: Sync + Send>(
     let response_id = reply.id;
 
     let ArchiveData { file, time_range } = archive_messages(
+        ctx,
         smart_messages_iter(ctx, ctx.channel_id(), messages_range).map_err(|e| e.into()),
         |status| async {
             ctx.channel_id()

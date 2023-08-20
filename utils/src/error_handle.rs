@@ -1,10 +1,8 @@
-
-
 #[macro_export]
 macro_rules! command_handler_wrapper {
     ($command:expr) => {
         $command.await.map_err(|err| {
-            let err = err
+            let err = dbg!(err)
                 .chain()
                 .rev()
                 .enumerate()

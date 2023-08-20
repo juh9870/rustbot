@@ -1,0 +1,13 @@
+{
+  "extends": [
+    "@tsconfig/node18/tsconfig.json",
+    "@tsconfig/strictest/tsconfig.json"
+  ],
+  "compilerOptions": {
+    "lib": ["dom", "es2023"],
+    "outDir": "dist",
+    "jsx": "react",
+    "jsxFactory": "createEl",
+    "jsxFragmentFactory": "DocumentFragment"
+  }
+}

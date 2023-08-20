@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use futures::Stream;
 use futures::StreamExt;
-use poise::serenity_prelude::{EmojiId, Message, ReactionType, Timestamp, User, UserId};
+use poise::serenity_prelude::{ChannelId, EmojiId, Message, ReactionType, Timestamp, User, UserId};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
@@ -29,7 +29,7 @@ struct ArchivalState {
 impl ArchivalState {
     async fn create() -> Result<Self> {
         let dir = tempdir()?;
-        let file = File::create(dir.path().join("messages.json")).await?;
+        let file = File::create(dir.path().join("messages.jsonp")).await?;
         let assets_dir = dir.path().join("assets");
         tokio::fs::create_dir(&assets_dir).await?;
         Ok(ArchivalState {
@@ -44,7 +44,7 @@ impl ArchivalState {
     }
 
     async fn finalize(&mut self) -> Result<()> {
-        self.file.write_all("\n]".as_bytes()).await?;
+        self.file.write_all("\n])".as_bytes()).await?;
         Ok(())
     }
 }
@@ -94,7 +94,6 @@ async fn ensure_emoji<'a>(
                 e.insert(file_path.strip_prefix(&state.root_dir)?.to_path_buf());
             }
             ReactionType::Unicode(emoji) => {
-                println!("{emoji}");
                 let asset = PngTwemojiAsset::from_emoji(emoji)
                     .or_else(|| PngTwemojiAsset::from_emoji(&emoji[..1]));
                 if let Some(asset) = asset {
@@ -134,24 +133,35 @@ struct ReactionStore {
     count: u64,
 }
 
-async fn process_message(state: &mut ArchivalState, message: &mut Message) -> Result<()> {
+async fn process_message<Data>(
+    ctx: poise::Context<'_, Data, anyhow::Error>,
+    state: &mut ArchivalState,
+    message: &mut Message,
+) -> Result<()> {
     let asset_path = &state.assets_dir;
+    let root_dir_path = state.root_dir.path();
     futures::future::join_all(
         message
             .attachments
-            .iter()
+            .iter_mut()
             .map(move |attachment| async move {
                 let filename = format!("{}_{}", attachment.id, attachment.filename);
                 let file_path = asset_path.join(&filename);
                 download_to_file(&attachment.url, &file_path)
                     .await
                     .context("Downloading attachment")?;
+                attachment.url = file_path
+                    .strip_prefix(root_dir_path)?
+                    .to_str()
+                    .ok_or_else(|| anyhow!("Bad file path"))?
+                    .to_string();
                 Result::<()>::Ok(())
             }),
     )
     .await
     .into_iter()
-    .collect::<Result<Vec<()>, _>>()?;
+    .collect::<Result<Vec<()>, _>>()
+    .context("downloading attachments")?;
 
     ensure_user_avatar(state, &mut message.author)
         .await
@@ -168,7 +178,7 @@ async fn process_message(state: &mut ArchivalState, message: &mut Message) -> Re
         })
     }
 
-    let emoji_regex = lazy_regex::regex!(r"<:.+?:([^:>]+)>");
+    let emoji_regex = lazy_regex::regex!(r"<:\w+:(\d{18})>");
     for emoji in emoji_regex
         .captures_iter(&message.content)
         .filter_map(|e| e.get(1).and_then(|e| e.as_str().parse::<u64>().ok()))
@@ -183,19 +193,54 @@ async fn process_message(state: &mut ArchivalState, message: &mut Message) -> Re
             .with_context(|| format!("fetching emoji {}", emoji))?;
     }
 
+    let mut channel_names = vec![];
+    let channel_regex = lazy_regex::regex!(r"<#(\d{18})>");
+    let channel_ids = channel_regex
+        .captures_iter(&message.content)
+        .filter_map(|e| e.get(1).and_then(|e| e.as_str().parse::<u64>().ok()))
+        .map(ChannelId::from)
+        .collect::<Vec<_>>();
+    for channel_id in &channel_ids {
+        channel_names.push(channel_id.name(ctx));
+    }
+
+    let channel_names: FxHashMap<ChannelId, String> = futures::future::join_all(channel_names)
+        .await
+        .into_iter()
+        .zip(channel_ids)
+        .filter_map(|(name, id)| name.map(|name| (id, name)))
+        .collect();
+
+    let mut roles = vec![];
+    for role in &message.mention_roles {
+        let role = role.to_role_cached(ctx);
+        if let Some(role) = role {
+            roles.push(role);
+        }
+    }
+
     // EMOJI_REGEX.find_iter(message.content)
 
     let mut json_string = if state.processed_count > 0 {
         ",\n"
     } else {
-        "[\n"
+        "jsonp_parse([\n"
     }
     .to_string();
 
-    let mut json_obj = serde_json::to_value(&message)?;
-    json_obj["reactions::processed"] = serde_json::to_value(reactions)?;
-    json_string += &serde_json::to_string(&json_obj)?;
-    state.file.write_all(json_string.as_bytes()).await?;
+    let mut json_obj = serde_json::to_value(&message).context("serializing main message data")?;
+    json_obj["reactions::processed"] =
+        serde_json::to_value(reactions).context("serializing reactions")?;
+    json_obj["mention_roles::processed"] =
+        serde_json::to_value(roles).context("serializing role mentions")?;
+    json_obj["mention_channels::processed"] =
+        serde_json::to_value(channel_names).context("serializing channel mentions")?;
+    json_string += &serde_json::to_string(&json_obj).context("stringifying json")?;
+    state
+        .file
+        .write_all(json_string.as_bytes())
+        .await
+        .context("writing to a file")?;
 
     state.processed_count += 1;
     match &mut state.time_range {
@@ -217,10 +262,12 @@ pub struct ArchiveData {
 }
 
 pub async fn archive_messages<
+    Data,
     Messages: Stream<Item = Result<Message>> + Send,
     Reporter: Fn(String) -> ReportResult,
     ReportResult: Future<Output = Result<()>>,
 >(
+    ctx: poise::Context<'_, Data, anyhow::Error>,
     messages: Messages,
     report: Reporter,
 ) -> Result<ArchiveData> {
@@ -243,9 +290,9 @@ pub async fn archive_messages<
             ))
             .await?;
         }
-        process_message(&mut state, &mut message)
+        process_message(ctx, &mut state, &mut message)
             .await
-            .with_context(|| format!("processing message {}", message.id))?;
+            .with_context(|| format!("processing message {}", message.link()))?;
     }
 
     state.finalize().await?;
@@ -255,7 +302,7 @@ pub async fn archive_messages<
         .unwrap_or_else(|| Timestamp::now()..Timestamp::now());
 
     report("Archiving files".to_string()).await?;
-    let mut file = NamedTempFile::new()?;
+    let mut file = NamedTempFile::new().context("creating archive file")?;
     archive_directory(state.root_dir.path(), file.as_file_mut()).context("zipping files")?;
 
     Ok(ArchiveData { file, time_range })

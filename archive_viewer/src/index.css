@@ -1,0 +1,157 @@
+body {
+  background-color: #313338;
+  color: lightgray;
+  font-family: Arial, Helvetica, sans-serif;
+}
+* {
+  scroll-behavior: smooth;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.pfp {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.pfp-reply {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.time {
+  font-size: 90%;
+  color: gray;
+}
+
+.pfp-spacer {
+  width: 40px;
+  min-width: 40px;
+  opacity: 0;
+}
+
+.reply-spacer {
+  margin: 7px 2px 2px 18px;
+  /*width: 32px;*/
+  min-width: 32px;
+  height: 12px;
+  border: 3px solid #4e5058;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 12px 0 0 0;
+}
+
+.message {
+  padding: 0.5em;
+}
+
+.message:hover {
+  background-color: #2e3035;
+}
+.message:hover .pfp-spacer {
+  opacity: 100%;
+}
+
+.body {
+  padding-left: 1em;
+  max-width: 80vw;
+}
+
+.image {
+  max-height: 350px;
+}
+
+.content {
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+.username {
+  font-weight: 500;
+  font-size: 110%;
+  font-family: Tahoma, sans-serif;
+}
+
+.header {
+  margin-bottom: 0.5em;
+  display: block;
+}
+
+.reply {
+  width: 80vw;
+}
+
+.header-reply {
+  width: 100%;
+}
+
+.reply-username {
+  font-size: 90%;
+  padding-left: 0.2em;
+}
+
+.reply-text {
+  font-size: 90%;
+  padding-left: 0.2em;
+  overflow: hidden;
+  text-overflow: fade;
+  color: darkgray;
+}
+
+.reply-text-attachment {
+  font-style: italic;
+}
+
+.attachment {
+  background-color: #2b2d31;
+  padding: 1em;
+  width: 432px;
+  border: 1px solid #232428;
+  border-radius: 10px;
+  text-decoration: none;
+}
+
+.attachment img {
+  width: 30px;
+  margin-right: 1em;
+}
+
+.attachment-title {
+  color: dodgerblue;
+  margin-bottom: 0.3em;
+}
+
+.attachment:hover .attachment-title {
+  text-decoration: underline;
+}
+
+.attachment-size {
+  color: gray;
+  font-size: 90%;
+}
+
+.flex-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.highlight {
+  animation-name: highlight;
+  animation-duration: 2s;
+  animation-timing-function: ease;
+}
+
+@keyframes highlight {
+  0% {
+  }
+  2% {
+    background-color: #393b47;
+  }
+  100% {
+  }
+}
