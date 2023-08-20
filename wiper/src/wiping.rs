@@ -6,8 +6,6 @@ use std::future::Future;
 use std::time::Duration;
 use utils::reporter::{CountingReporter, Reporter, SimpleReporter};
 
-const BATCH_SIZE: usize = 16;
-
 pub async fn wipe_messages<
     Messages: Stream<Item = Result<Message>> + Send,
     Reporter: Fn(String, bool) -> ReportResult,
