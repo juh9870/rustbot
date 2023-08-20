@@ -1,0 +1,21 @@
+[package]
+name = "archival"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+poise = "0.5.5"
+poise_macros = "0.5.5"
+anyhow = "1.0.71"
+tempfile = "3.6.0"
+tokio = { version = "1.28.1", features = ["fs"] }
+serde = "1.0.163"
+serde_json = "1.0.96"
+lazy-regex = "3.0.0"
+futures = "0.3.28"
+twemoji-assets = { version = "1.0", features = ["png", "names"] }
+url = "2.4.0"
+rustc-hash = "1.1.0"
+utils = { path = "../utils" }

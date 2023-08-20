@@ -59,6 +59,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b13c32d80ecc7ab747b80c3784bce54ee8a7a0cc4fbda9bf4cda2cf6fe90854"
 
 [[package]]
+name = "archival"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "lazy-regex",
+ "poise",
+ "poise_macros",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "twemoji-assets",
+ "url",
+ "utils",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -363,26 +382,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "discord_bot"
+name = "eh_bot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "futures",
- "lazy-regex",
- "lazy_static",
- "pluralizer",
+ "archival",
  "poise",
  "poise_macros",
- "reqwest",
- "rustc-hash",
- "serde",
- "serde_json",
- "tempfile",
  "tokio",
- "twemoji-assets",
- "url",
- "walkdir",
- "zip",
 ]
 
 [[package]]
@@ -1890,6 +1897,23 @@ name = "utf-8"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
+
+[[package]]
+name = "utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "pluralizer",
+ "poise",
+ "poise_macros",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "walkdir",
+ "zip",
+]
 
 [[package]]
 name = "vcpkg"
