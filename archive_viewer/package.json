@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "format": "prettier --write ./**/*.{ts,tsx,js,jsx,css,mjs,json}",
-    "build": "node build.mjs",
+    "build": "rimraf dist && node build.mjs",
     "watch": "node watch.mjs"
   },
   "keywords": [],
@@ -26,6 +26,7 @@
     "@craftamap/esbuild-plugin-html": "^0.6.1",
     "@tsconfig/node18": "^18.2.0",
     "@tsconfig/strictest": "^2.0.1",
-    "janadom": "^0.1.2"
+    "janadom": "^0.1.2",
+    "rimraf": "^5.0.1"
   }
 }
