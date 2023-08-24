@@ -197,7 +197,7 @@ async fn handle_archive<T: Sync + Send>(
 
         let _ = channel.delete_message(ctx, wiper_status).await;
     } else {
-        set_dummy_text_component(ctx, &mut latest_message, "Wiping canceled").await?;
+        let _ = set_dummy_text_component(ctx, &mut latest_message, "Wiping canceled").await;
     }
 
     file.close()?;

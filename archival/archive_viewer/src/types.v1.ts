@@ -25,6 +25,7 @@ export interface Message {
   pinned: boolean;
   reactions: Reaction[];
   'mention_channels::processed': Record<string, string>;
+  'stickers::processed': Record<string, string>;
   'mention_roles::processed': MentionRolesProcessed[];
   'reactions::processed': ReactionsProcessed[];
   referenced_message?: ReferencedMessage;
@@ -213,7 +214,7 @@ export interface ReferencedMessage {
   pinned: boolean;
   reactions: unknown[];
   referenced_message: unknown;
-  sticker_items: unknown[];
+  sticker_items: StickerItem[];
   thread: unknown;
   timestamp: string;
   tts: boolean;

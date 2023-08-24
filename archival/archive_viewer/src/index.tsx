@@ -1,4 +1,4 @@
-import { Attachment, Message } from './types.v1';
+import { Attachment, Message, StickerItem } from './types.v1';
 import { createEl } from 'janadom';
 import './reset.css';
 import './index.css';
@@ -29,16 +29,16 @@ function parseContent(content: string, message: Message): HTMLElement[] {
   // console.log(parsed);
 
   parsed = parsed.replace(/&lt;:\w+:(\d{18})&gt;/g, (_, id) => {
-    return `<img class="inline-emoji" src="assets/${id}.png" alt="${id}"></img>`;
+    return `<img class='inline-emoji' src='assets/${id}.png' alt='${id}'></img>`;
   });
   parsed = parsed.replace(/<t:(\d+)(?::.)?>/g, (_, time) => {
     let date = new Date(+time * 1000);
-    return `<span class="mention timestamp">${date.toUTCString()}</span>`;
+    return `<span class='mention timestamp'>${date.toUTCString()}</span>`;
   });
   parsed = parsed.replace(/&lt;@!?(\d{18})&gt;/g, (text, id) => {
     let mentioned = message.mentions.find((e) => e.id === id);
     if (!mentioned) return text;
-    return `<span class="mention">@${mentioned.username}</span>`;
+    return `<span class='mention'>@${mentioned.username}</span>`;
   });
 
   parsed = parsed.replace(/&lt;@&amp;(\d{18})&gt;/g, (text, id) => {
@@ -48,14 +48,14 @@ function parseContent(content: string, message: Message): HTMLElement[] {
     );
     if (!mentioned) return text;
     let color = '#' + mentioned.color.toString(16).padStart(6, '0');
-    return `<span class="mention" style="color: ${color}; background-color: ${color}1a">@${mentioned.name}</span>`;
+    return `<span class='mention' style='color: ${color}; background-color: ${color}1a'>@${mentioned.name}</span>`;
   });
 
   parsed = parsed.replace(/&lt;#(\d{18})&gt;/g, (text, id) => {
     // console.log(text, id);
     let mentioned = message['mention_channels::processed'][id];
     if (!mentioned) return text;
-    return `<span class="mention">#${mentioned}</span>`;
+    return `<span class='mention'>#${mentioned}</span>`;
   });
 
   element.innerHTML = parsed;
@@ -85,6 +85,22 @@ function attachment(attachment: Attachment): HTMLElement {
   }
 }
 
+function sticker(message: Message, sticker: StickerItem): HTMLElement | null {
+  let stickerImage = message['stickers::processed'][sticker.id];
+  if (!stickerImage) return null;
+  let extension = stickerImage.toLowerCase().split('.').pop()!;
+  if (extension === 'json') {
+    return (
+      <div class='attachment'>
+        :{sticker.name}:{' '}
+        <span class='attachment-size'>(unsupported animated sticker)</span>
+      </div>
+    );
+  } else {
+    return <img class='sticker' src={stickerImage} alt={sticker.name} />;
+  }
+}
+
 function highlight(targetId: string) {
   let element = document.getElementById(targetId);
   if (element) {
@@ -93,6 +109,20 @@ function highlight(targetId: string) {
       element!.classList.add('highlight');
     }, 0);
   }
+}
+
+function reactions(message: Message) {
+  return (
+    <div class='flex-row'>
+      {message['reactions::processed'].map(({ count, path }) => {
+        return (
+          <span class='reaction'>
+            <img src={path} alt='reaction' class='pic' /> {count}
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 function message(
@@ -113,7 +143,9 @@ function message(
           Click to see attachment
         </div>
       ) : (
-        <div class='reply-text'>{parseContent(replyTo.content, replyTo)}</div>
+        <div class='reply-text markdown'>
+          {parseContent(replyTo.content.replace(/\n/g, ' '), replyTo)}
+        </div>
       );
     reply = (
       <a
@@ -126,8 +158,8 @@ function message(
         </div>
         <div class='flex-row header-reply'>
           <img
-            src={message.author.avatar}
-            alt={message.author.username}
+            src={replyTo.author.avatar}
+            alt={replyTo.author.username}
             class='pfp-reply'
           ></img>
           <div class='reply-username'>{replyTo.author.username}</div>
@@ -160,6 +192,8 @@ function message(
             {parseContent(message.content, message)}
           </div>
           {message.attachments.map(attachment)}
+          {message.sticker_items.map((e) => sticker(message, e))}
+          {reactions(message)}
         </div>
       </div>
     </div>

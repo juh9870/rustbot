@@ -20,3 +20,7 @@ url = "2.4.0"
 rustc-hash = "1.1.0"
 utils = { path = "../utils" }
 wiper = { path = "../wiper" }
+
+[build-dependencies]
+duct = "0.13.6"
+npm_rs = "1.0.0"

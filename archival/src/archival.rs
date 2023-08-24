@@ -1,7 +1,9 @@
 use anyhow::{anyhow, bail, Context, Result};
 use futures::Stream;
 use futures::StreamExt;
-use poise::serenity_prelude::{ChannelId, EmojiId, Message, ReactionType, Timestamp, User, UserId};
+use poise::serenity_prelude::{
+    ChannelId, EmojiId, Message, ReactionType, StickerId, StickerItem, Timestamp, User, UserId,
+};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
@@ -24,12 +26,17 @@ struct ArchivalState {
     processed_count: usize,
     avatars: FxHashMap<UserId, PathBuf>,
     emojis: FxHashMap<ReactionType, PathBuf>,
+    stickers: FxHashMap<StickerId, PathBuf>,
 }
 
 impl ArchivalState {
     async fn create() -> Result<Self> {
         let dir = tempdir()?;
         let file = File::create(dir.path().join("messages.jsonp")).await?;
+        File::create(dir.path().join("archive.html"))
+            .await?
+            .write_all(include_bytes!("../archive_viewer/dist/archive.html"))
+            .await?;
         let assets_dir = dir.path().join("assets");
         tokio::fs::create_dir(&assets_dir).await?;
         Ok(ArchivalState {
@@ -40,6 +47,7 @@ impl ArchivalState {
             processed_count: 0,
             avatars: Default::default(),
             emojis: Default::default(),
+            stickers: Default::default(),
         })
     }
 
@@ -81,6 +89,27 @@ async fn ensure_user_avatar<'a>(state: &'a mut ArchivalState, user: &mut User) -
     Ok(avatar)
 }
 
+async fn ensure_sticker<'a>(
+    state: &'a mut ArchivalState,
+    sticker: &StickerItem,
+) -> Result<&'a Path> {
+    if let std::collections::hash_map::Entry::Vacant(e) = state.stickers.entry(sticker.id) {
+        let image_url = sticker
+            .image_url()
+            .ok_or_else(|| anyhow!("Sticker image URL missing"))?;
+        println!("Sticker: {image_url}");
+        let extension = get_extension_from_url(&image_url)?;
+        let file_path = state.assets_dir.join(format!("{}.{extension}", sticker.id));
+        download_to_file(&image_url, &file_path).await?;
+        e.insert(file_path.strip_prefix(&state.root_dir)?.to_path_buf());
+    }
+
+    Ok(state
+        .stickers
+        .get(&sticker.id)
+        .expect("Failed to retrieve sticker reference"))
+}
+
 async fn ensure_emoji<'a>(
     state: &'a mut ArchivalState,
     reaction: &ReactionType,
@@ -94,8 +123,15 @@ async fn ensure_emoji<'a>(
                 e.insert(file_path.strip_prefix(&state.root_dir)?.to_path_buf());
             }
             ReactionType::Unicode(emoji) => {
-                let asset = PngTwemojiAsset::from_emoji(emoji)
-                    .or_else(|| PngTwemojiAsset::from_emoji(&emoji[..1]));
+                let asset = PngTwemojiAsset::from_emoji(emoji).or_else(|| {
+                    PngTwemojiAsset::from_emoji(
+                        &emoji
+                            .chars()
+                            .next()
+                            .expect("Empty reaction string")
+                            .to_string(),
+                    )
+                });
                 if let Some(asset) = asset {
                     let file_name = state.assets_dir.join(format!(
                         "{}.png",
@@ -162,6 +198,15 @@ async fn process_message<Data>(
     .into_iter()
     .collect::<Result<Vec<()>, _>>()
     .context("downloading attachments")?;
+
+    let mut stickers = vec![];
+    for sticker in &message.sticker_items {
+        let path = ensure_sticker(state, sticker)
+            .await
+            .with_context(|| format!("Fetching sticker {}", sticker.id))?;
+        stickers.push((sticker.id, path.to_owned()));
+    }
+    let stickers = stickers.into_iter().collect::<FxHashMap<_, _>>();
 
     ensure_user_avatar(state, &mut message.author)
         .await
@@ -235,6 +280,8 @@ async fn process_message<Data>(
         serde_json::to_value(roles).context("serializing role mentions")?;
     json_obj["mention_channels::processed"] =
         serde_json::to_value(channel_names).context("serializing channel mentions")?;
+    json_obj["stickers::processed"] =
+        serde_json::to_value(stickers).context("serializing used stickers")?;
     json_string += &serde_json::to_string(&json_obj).context("stringifying json")?;
     state
         .file

@@ -11,7 +11,7 @@ declare global {
 
     // The following are custom types, not part of TS's known JSX namespace:
     type IntrinsicElementMap = {
-      [K in keyof HTMLElementTagNameMap | 'svg']: Props;
+      [K in keyof HTMLElementTagNameMap]: Props;
     };
 
     interface Component {

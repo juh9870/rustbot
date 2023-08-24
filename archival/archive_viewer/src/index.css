@@ -5,6 +5,7 @@ body {
 }
 * {
   scroll-behavior: smooth;
+  line-height: 22px!important;
 }
 
 a {
@@ -64,6 +65,27 @@ a {
 
 .image {
   max-height: 350px;
+  max-width: 90vw;
+}
+.sticker {
+  width: 167px;
+  height: 167px;
+}
+
+.reaction {
+  margin-top: 6px;
+  margin-right: 4px;
+  background-color: rgb(43, 45, 49);
+  border-radius: 8px;
+  /*border: 1px solid rgb(35, 40, 40);*/
+  padding: 4px 8px;
+}
+
+.reaction .pic {
+  width: 16px;
+  height: 16px;
+  vertical-align: bottom;
+  display: inline;
 }
 
 .content {
@@ -96,11 +118,16 @@ a {
 }
 
 .reply-text {
-  font-size: 90%;
   padding-left: 0.2em;
   overflow: hidden;
-  text-overflow: fade;
   color: darkgray;
+}
+
+.reply-text * {
+  font-size: 90%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
 }
 
 .reply-text-attachment {
