@@ -2,6 +2,7 @@ body {
   background-color: #313338;
   color: lightgray;
   font-family: Arial, Helvetica, sans-serif;
+  padding-bottom: 10rem;
 }
 * {
   scroll-behavior: smooth;
@@ -48,7 +49,7 @@ a {
 }
 
 .message {
-  padding: 0.5em;
+  padding: 2px 0;
 }
 
 .message:hover {
@@ -100,7 +101,6 @@ a {
 }
 
 .header {
-  margin-bottom: 0.5em;
   display: block;
 }
 
