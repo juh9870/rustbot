@@ -39,10 +39,10 @@ jobs:
       - run: "ls"
       - name: "Install packages"
         run: "npm ci"
-        working-directory: ./archival/archive_viever
+        working-directory: archival/archive_viewer
       - name: "Build nodejs"
         run: "npm run build-ci"
-        working-directory: ./archival/archive_viever
+        working-directory: archival/archive_viewer
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "ci-test-rust"
