@@ -54,12 +54,13 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: "--locked --release"
           strip: true
+      - run: "ls target/${{ matrix.platform.target }}/release/"
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/${{ matrix.target }}/release/${{ matrix.name }}
-          asset_name: ${{ matrix.name }}
+          file: target/${{ matrix.platform.target }}/release/${{ matrix.platform.name }}
+          asset_name: ${{ matrix.platform.name }}
           # tag: ${{ github.ref }}
           tag: "v0.0.1"
 
