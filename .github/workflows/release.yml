@@ -8,12 +8,12 @@ jobs:
     strategy:
       matrix:
         platform:
-          # - release_for: Linux-x86_64
-          #   os: ubuntu-20.04
-          #   target: x86_64-unknown-linux-musl
-          #   bin: eh_bot
-          #   name: eh_bot-x86_64.tar.gz
-          #   command: build
+          - release_for: Linux-x86_64
+            os: ubuntu-20.04
+            target: x86_64-unknown-linux-musl
+            bin: eh_bot
+            name: eh_bot-x86_64.tar.gz
+            command: build
 
           - release_for: Linux-ARMv7-gnu-hf
             os: ubuntu-20.04
@@ -22,12 +22,12 @@ jobs:
             name: eh_bot-ARMv7
             command: build
 
-          # - release_for: Windows-x86_64
-          #   os: windows-latest
-          #   target: x86_64-pc-windows-msvc
-          #   bin: eh_bot.exe
-          #   name: eh_bot-Windows-x86_64.zip
-          #   command: both
+          - release_for: Windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: eh_bot.exe
+            name: eh_bot-Windows-x86_64.zip
+            command: both
 
     runs-on: ${{ matrix.platform.os }}
     steps:
@@ -36,7 +36,9 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
-      - run: "ls"
+          cache: "npm"
+          cache-dependency-path: "archival/archive_viewer/package-lock.json"
+      # - run: "ls"
       - name: "Install packages"
         run: "npm ci"
         working-directory: archival/archive_viewer
@@ -54,7 +56,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: "--locked --release"
           strip: true
-      - run: "ls target/${{ matrix.platform.target }}/release/"
+      # - run: "ls target/${{ matrix.platform.target }}/release/"
       - run: "mv target/${{ matrix.platform.target }}/release/${{ matrix.platform.bin }} ${{ matrix.platform.name }}"
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
@@ -62,6 +64,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ matrix.platform.name }}
           asset_name: ${{ matrix.platform.name }}
+          overwrite: true
           # tag: ${{ github.ref }}
           tag: "v0.0.1"
 
