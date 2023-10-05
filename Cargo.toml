@@ -13,6 +13,3 @@ members = [
 opt-level = 3
 lto = true
 codegen-units = 1
-
-[target.armv7-unknown-linux-gnueabihf.dependencies]
-openssl = { version = "*", features = ["vendored"] }
