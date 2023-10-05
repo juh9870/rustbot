@@ -65,5 +65,4 @@ jobs:
           file: ${{ matrix.platform.name }}
           asset_name: ${{ matrix.platform.name }}
           overwrite: true
-          # tag: ${{ github.ref }}
-          tag: "v0.0.1"
+          tag: ${{ github.ref }}
