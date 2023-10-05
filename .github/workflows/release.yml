@@ -1,6 +1,6 @@
 on:
-  push:
-    # types: [created]
+  release:
+    types: [created]
 
 jobs:
   release:
@@ -47,7 +47,7 @@ jobs:
         working-directory: archival/archive_viewer
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "ci-test-rust"
+          # prefix-key: "ci-test-rust"
           key: ${{ matrix.platform.release_for }}
       - name: Build binary
         uses: houseabsolute/actions-rust-cross@v0
@@ -67,5 +67,3 @@ jobs:
           overwrite: true
           # tag: ${{ github.ref }}
           tag: "v0.0.1"
-
-    # more packaging stuff goes here ...
