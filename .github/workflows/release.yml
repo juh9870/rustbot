@@ -54,7 +54,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: "--locked --release"
           strip: true
-      - run: "ls target/${{ matrix.platform.target }}/release/"
+      - run: "find . -name ${{ matrix.platform.name }}"
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
