@@ -26,7 +26,7 @@ jobs:
             os: windows-latest
             target: x86_64-pc-windows-msvc
             bin: eh_bot.exe
-            name: eh_bot-Windows-x86_64.zip
+            name: eh_bot-Windows-x86_64.exe
             command: both
 
     runs-on: ${{ matrix.platform.os }}
