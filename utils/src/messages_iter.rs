@@ -111,28 +111,6 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
     /// necessary.
     ///
     /// The stream returns the newest message first, followed by older messages.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// # use serenity::model::id::ChannelId;
-    /// # use serenity::http::Http;
-    /// #
-    /// # async fn run() {
-    /// # let channel_id = ChannelId::default();
-    /// # let ctx = Http::new("token");
-    /// use serenity::futures::StreamExt;
-    /// use serenity::model::channel::MessagesIter;
-    ///
-    /// let mut messages = SmartMessagesIter::<Http>::stream(&ctx, channel_id).boxed();
-    /// while let Some(message_result) = messages.next().await {
-    ///     match message_result {
-    ///         Ok(message) => println!("{} said \"{}\"", message.author.name, message.content,),
-    ///         Err(error) => eprintln!("Uh oh! Error: {}", error),
-    ///     }
-    /// }
-    /// # }
-    /// ```
     pub fn stream(
         http: impl AsRef<Http>,
         channel_id: ChannelId,
