@@ -7,6 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "format": "prettier --write ./**/*.{ts,tsx,js,jsx,css,mjs,json}",
     "build": "rimraf dist && node build.mjs",
+    "build-ci": "npm run build && rimraf ci && mkdir -p ci && mv ./dist/archive.html ./ci/archive.html && rimraf dist",
     "watch": "node watch.mjs"
   },
   "keywords": [],
