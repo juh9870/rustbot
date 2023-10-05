@@ -1,4 +1,4 @@
-use anyhow::{bail, Context};
+use anyhow::{bail, Context, Error};
 use poise::serenity_prelude::Timestamp;
 use serde::Deserialize;
 use std::path::Path;
@@ -38,15 +38,26 @@ pub async fn upload_file(
 }
 
 pub async fn download_to_file(url: &str, file: &Path) -> anyhow::Result<()> {
-    let response = reqwest::get(url).await?;
+    let mut retries = 3;
+    let bytes = loop {
+        let response = reqwest::get(url).await?;
+        let bytes = response
+            .bytes()
+            .await
+            .with_context(|| format!("downloading file at {url}"));
+        match bytes {
+            Ok(bytes) => break bytes,
+            Err(err) => {
+                if retries == 0 {
+                    return Err(err);
+                }
+                retries -= 1;
+            }
+        }
+    };
     tokio::fs::File::create(&file)
         .await?
-        .write_all(
-            &response
-                .bytes()
-                .await
-                .with_context(|| format!("downloading file at {url}"))?,
-        )
+        .write_all(&bytes)
         .await?;
     Ok(())
 }
