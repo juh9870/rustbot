@@ -36,6 +36,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
+      - run: "ls"
       - name: "Install packages"
         run: "npm ci"
         working-directory: ./archival/archive_viever
