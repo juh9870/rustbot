@@ -18,7 +18,7 @@ pub async fn wipe_messages<
 ) -> Result<()> {
     let two_weeks_ago = Timestamp::from(
         Timestamp::now()
-            .checked_sub_days(Days::new(0))
+            .checked_sub_days(Days::new(13))
             .expect("Invalid system clock time"),
     );
 
