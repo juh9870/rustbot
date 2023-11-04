@@ -2,19 +2,16 @@
 name = "utils"
 version = "0.1.0"
 edition = "2021"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-poise = "0.5.5"
-poise_macros = "0.5.5"
-anyhow = "1.0.72"
-tokio = { version = "1.28.1", features = ["fs"] }
-futures = "0.3.28"
-walkdir = "2.3.3"
-serde = "1.0.163"
-serde_json = "1.0.96"
-zip = "0.6.6"
-reqwest = "0.11.18"
-pluralizer = "0.4.0"
-num-traits = "0.2.15"
+anyhow = { workspace = true }
+futures = { workspace = true }
+num-traits = { workspace = true }
+pluralizer = { workspace = true }
+poise = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true, features = ["fs"] }
+walkdir = { workspace = true }
+zip = { workspace = true }

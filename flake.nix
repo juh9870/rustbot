@@ -18,26 +18,27 @@
         build-deps = with pkgs; [
           pkg-config
           openssl
-          # udev
-          # alsa-lib
-          # vulkan-loader
-          # # x11 dpendencies
-          # xorg.libX11
-          # xorg.libXcursor
-          # xorg.libXi
-          # xorg.libXrandr
-          # # Wayland dependencies
-          # libxkbcommon
-          # wayland
         ];
-      in pkgs.mkShell {
+      in pkgs.mkShell.override {
+        stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
+      } {
         packages = build-deps ++ [
           toolchain
           pkgs.cargo-bloat
           pkgs.cargo-unused-features
           pkgs.rust-analyzer-unwrapped
+          pkgs.cargo-watch
+          pkgs.cargo-sort
+          pkgs.cargo-machete
+          pkgs.cargo-depgraph
+          pkgs.cargo-limit
+          pkgs.pre-commit
           pkgs.nodejs_18
         ];
+
+        shellHook = ''
+          pre-commit install
+        '';
 
         RUST_SRC_PATH = "${toolchain}/lib/rustlib/src/rust/library";
         NIX_LD = pkgs.runCommand "ld.so" { } ''
