@@ -1,0 +1,24 @@
+# Build
+/target
+node_modules
+dist
+
+# IDE
+.idea
+
+# Git
+.github
+.git
+**/.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Dev Tools
+fix.sh
+watch.sh
+flake.lock
+flake.nix
+.pre-commit-config.yaml
+.prettierrc.json
