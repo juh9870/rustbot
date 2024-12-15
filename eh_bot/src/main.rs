@@ -9,9 +9,25 @@ type Context<'a> = poise::Context<'a, Data, anyhow::Error>;
 
 archive_command!(archive, Data);
 
-#[poise::command(prefix_command)]
+#[poise::command(prefix_command, owners_only, hide_in_help)]
 async fn register(ctx: Context<'_>) -> Result<()> {
     poise::builtins::register_application_commands_buttons(ctx).await?;
+    Ok(())
+}
+
+/// Help command
+#[poise::command(prefix_command, track_edits, slash_command)]
+pub async fn help(
+    ctx: Context<'_>,
+    #[description = "Specific command to show help about"] command: Option<String>,
+) -> Result<()> {
+    let config = poise::builtins::HelpConfiguration {
+        extra_text_at_bottom: "\
+Type /help command for more info on a command.",
+        ..Default::default()
+    };
+    poise::builtins::help(ctx, command.as_deref(), config).await?;
+
     Ok(())
 }
 
@@ -22,7 +38,7 @@ async fn main() {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![register(), archive()],
+            commands: vec![register(), archive(), help()],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some("dh!".to_string()),
                 ..Default::default()

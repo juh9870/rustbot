@@ -20,6 +20,7 @@ type Context<'a, T> = poise::Context<'a, T, Error>;
 #[macro_export]
 macro_rules! archive_command {
     ($name:ident, $data:ty) => {
+        /// Archive the current channel (optionally wiping it)
         #[poise::command(
             slash_command,
             prefix_command,
