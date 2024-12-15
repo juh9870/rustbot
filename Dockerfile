@@ -20,6 +20,8 @@ COPY . .
 RUN cargo build --release --bin eh_bot
 
 FROM scratch AS runtime
-WORKDIR /
+
+RUN mkdir /tmp
+
 COPY --from=builder /app/target/release/eh_bot /
 ENTRYPOINT ["/eh_bot"]
