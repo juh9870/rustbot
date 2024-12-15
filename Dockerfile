@@ -19,9 +19,8 @@ RUN cargo chef cook  --bin eh_bot --release --recipe-path recipe.json
 COPY . .
 RUN cargo build --release --bin eh_bot
 
-FROM scratch AS runtime
-
-RUN mkdir /tmp
+FROM alpine:3.20 AS runtime
 
 COPY --from=builder /app/target/release/eh_bot /
+
 ENTRYPOINT ["/eh_bot"]
