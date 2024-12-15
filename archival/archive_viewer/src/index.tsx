@@ -158,7 +158,7 @@ function message(
         </div>
         <div class='flex-row header-reply'>
           <img
-            src={replyTo.author.avatar}
+            src={replyTo['author_avatar::processed'] ?? replyTo.author.avatar}
             alt={replyTo.author.username}
             class='pfp-reply'
           ></img>
@@ -174,7 +174,7 @@ function message(
       <div class='flex-row'>
         {show_header ? (
           <img
-            src={message.author.avatar}
+            src={message['author_avatar::processed'] ?? message.author.avatar}
             alt={message.author.username}
             class='pfp'
           ></img>

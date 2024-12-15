@@ -20,8 +20,8 @@ utils = { path = "../utils" }
 wiper = { path = "../wiper" }
 
 [build-dependencies]
-duct = "0.13.6"
-npm_rs = "1.0.0"
+duct = { workspace = true }
+npm_rs = { workspace = true }
 
 [target.armv7-unknown-linux-gnueabihf.dependencies]
 openssl = { version = "*", features = ["vendored"] }

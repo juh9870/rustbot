@@ -10,7 +10,7 @@ pub async fn wipe_messages<
     Messages: Stream<Item = Result<Message>> + Send,
     Reporter: Fn(String, bool) -> ReportResult,
     ReportResult: Future<Output = Result<()>>,
-    Data: Sync,
+    Data: Send + Sync,
 >(
     ctx: poise::Context<'_, Data, anyhow::Error>,
     messages: Messages,

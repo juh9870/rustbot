@@ -8,6 +8,7 @@ use tokio::time::sleep;
 use utils::command_handler_wrapper;
 use utils::component_tools::{clear_components, set_dummy_text_component};
 use utils::confirmations::{confirm_buttons, BtnConfirmOptions};
+use utils::into_edit::IntoEdit;
 use utils::messages_iter::{smart_messages_iter, MessagesRange};
 use utils::web_files::messaged::upload_file_and_message;
 use wiper::wiping::wipe_messages;
@@ -79,14 +80,10 @@ async fn handle_archive<T: Sync + Send>(
 
     clear_components(ctx, &mut reply).await?;
     if !confirmed {
-        reply
-            .edit(ctx, |msg| msg.content("Operation canceled"))
-            .await?;
+        reply.edit(ctx, "Operation canceled".into_edit()).await?;
         return Ok(());
     }
-    reply
-        .edit(ctx, |msg| msg.content("Archival in progress"))
-        .await?;
+    reply.edit(ctx, "Archival in progress".into_edit()).await?;
 
     let response_id = reply.id;
 
@@ -95,7 +92,7 @@ async fn handle_archive<T: Sync + Send>(
         smart_messages_iter(ctx, ctx.channel_id(), messages_range).map_err(|e| e.into()),
         |status| async {
             ctx.channel_id()
-                .edit_message(ctx, response_id, |msg| msg.content(status))
+                .edit_message(ctx, response_id, status.into_edit())
                 .await?;
             Ok(())
         },
@@ -120,19 +117,17 @@ async fn handle_archive<T: Sync + Send>(
     if let Ok(id) = archive_name.parse::<u64>() {
         let user = UserId::from(id);
         if let Ok(user) = user.to_user(ctx).await {
-            if user.discriminator == 0 {
-                archive_name = format!("{} ({})", user.name, user.id)
+            if let Some(discriminator) = user.discriminator {
+                archive_name = format!("{}#{:0>4} ({})", user.name, discriminator, user.id)
             } else {
-                archive_name = format!("{}#{:0>4} ({})", user.name, user.discriminator, user.id)
+                archive_name = format!("{} ({})", user.name, user.id)
             }
         }
     }
 
     let filename = format!("{} - {archive_name}.zip", date_string);
 
-    reply
-        .edit(ctx, |msg| msg.content("Uploading archive"))
-        .await?;
+    reply.edit(ctx, "Uploading archive".into_edit()).await?;
 
     let timeout = 60 * 15;
 
@@ -184,7 +179,7 @@ async fn handle_archive<T: Sync + Send>(
             |status, is_due| async move {
                 if is_due {
                     channel
-                        .edit_message(ctx, wiper_status, |msg| msg.content(status))
+                        .edit_message(ctx, wiper_status, status.into_edit())
                         .await?;
                 }
                 Ok(())

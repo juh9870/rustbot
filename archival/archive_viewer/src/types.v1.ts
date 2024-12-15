@@ -27,6 +27,7 @@ export interface Message {
   'mention_channels::processed': Record<string, string>;
   'stickers::processed': Record<string, string>;
   'mention_roles::processed': MentionRolesProcessed[];
+  'author_avatar::processed'?: string;
   'reactions::processed': ReactionsProcessed[];
   referenced_message?: ReferencedMessage;
   sticker_items: StickerItem[];
@@ -221,6 +222,7 @@ export interface ReferencedMessage {
   type: number;
   webhook_id: unknown;
 }
+
 export interface StickerItem {
   format_type: number;
   id: string;

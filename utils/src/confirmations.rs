@@ -1,9 +1,10 @@
 use anyhow::Result;
 use futures::StreamExt;
 use poise::serenity_prelude::{
-    ButtonStyle, ComponentInteractionCollectorBuilder, InteractionResponseType, Message,
+    ButtonStyle, ComponentInteractionCollector, CreateButton, CreateInteractionResponse, Message,
 };
 
+use crate::into_edit::IntoEdit;
 use std::time::Duration;
 
 pub struct BtnConfirmOptions {
@@ -52,44 +53,37 @@ impl From<bool> for ConfirmationResult {
     }
 }
 
-pub async fn confirm_buttons<T: Sync>(
+pub async fn confirm_buttons<T: Send + Sync>(
     ctx: poise::Context<'_, T, anyhow::Error>,
     message: &mut Message,
     options: BtnConfirmOptions,
 ) -> Result<ConfirmationResult> {
-    message
-        .edit(ctx, |msg| {
-            msg.components(|c| {
-                c.create_action_row(|row| {
-                    row.create_button(|btn| {
-                        btn.label(options.confirm_text)
-                            .style(options.confirm_style)
-                            .custom_id("confirm")
-                    })
-                    .create_button(|btn| {
-                        btn.label(options.cancel_text)
-                            .style(options.cancel_style)
-                            .custom_id("cancel")
-                    })
-                })
-            })
-        })
-        .await?;
+    let buttons = vec![
+        CreateButton::new("confirm")
+            .label(options.confirm_text)
+            .style(options.confirm_style),
+        CreateButton::new("cancel")
+            .label(options.cancel_text)
+            .style(options.cancel_style),
+    ]
+    .into_edit();
+    message.edit(ctx, buttons).await?;
 
-    let mut builder = ComponentInteractionCollectorBuilder::new(ctx)
+    let mut interactions = ComponentInteractionCollector::new(ctx)
         .message_id(message.id)
         .author_id(ctx.author().id)
-        .collect_limit(1)
         .timeout(options.timeout)
-        .build();
+        .stream()
+        .take(1);
 
-    let confirmed = match builder.next().await {
+    let confirmed = match interactions.next().await {
         None => false,
         Some(interaction) => {
             interaction
-                .create_interaction_response(ctx.serenity_context(), |r| {
-                    r.kind(InteractionResponseType::DeferredUpdateMessage)
-                })
+                .create_response(
+                    ctx.serenity_context(),
+                    CreateInteractionResponse::Acknowledge,
+                )
                 .await?;
             interaction.data.custom_id == "confirm"
         }

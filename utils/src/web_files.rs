@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Error};
+use anyhow::{bail, Context};
 use poise::serenity_prelude::Timestamp;
 use serde::Deserialize;
 use std::path::Path;

@@ -65,7 +65,7 @@ fn get_extension_from_url(file_url: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("Missing file extension"))
 }
 
-async fn ensure_user_avatar<'a>(state: &'a mut ArchivalState, user: &mut User) -> Result<&'a Path> {
+async fn ensure_user_avatar(state: &mut ArchivalState, user: &mut User) -> Result<String> {
     if let std::collections::hash_map::Entry::Vacant(e) = state.avatars.entry(user.id) {
         let avatar_url = user.face();
 
@@ -80,13 +80,16 @@ async fn ensure_user_avatar<'a>(state: &'a mut ArchivalState, user: &mut User) -
         .avatars
         .get(&user.id)
         .expect("Failed to retrieve avatar reference");
-    user.avatar = Some(
-        avatar
-            .to_str()
-            .ok_or_else(|| anyhow!("Failed to stringify avatar url"))?
-            .to_string(),
-    );
-    Ok(avatar)
+    // user.avatar = Some(
+    //     avatar
+    //         .to_str()
+    //         .ok_or_else(|| anyhow!("Failed to stringify avatar url"))?
+    //         .to_string(),
+    // );
+    Ok(avatar
+        .to_str()
+        .ok_or_else(|| anyhow!("Failed to stringify avatar url"))?
+        .to_string())
 }
 
 async fn ensure_sticker<'a>(
@@ -169,7 +172,7 @@ struct ReactionStore {
     count: u64,
 }
 
-async fn process_message<Data>(
+async fn process_message<Data: Send + Sync>(
     ctx: poise::Context<'_, Data, anyhow::Error>,
     state: &mut ArchivalState,
     message: &mut Message,
@@ -208,7 +211,7 @@ async fn process_message<Data>(
     }
     let stickers = stickers.into_iter().collect::<FxHashMap<_, _>>();
 
-    ensure_user_avatar(state, &mut message.author)
+    let avatar = ensure_user_avatar(state, &mut message.author)
         .await
         .context("fetching user avatar")?;
 
@@ -253,14 +256,16 @@ async fn process_message<Data>(
         .await
         .into_iter()
         .zip(channel_ids)
-        .filter_map(|(name, id)| name.map(|name| (id, name)))
+        .filter_map(|(name, id)| name.ok().map(|name| (id, name)))
         .collect();
 
     let mut roles = vec![];
-    for role in &message.mention_roles {
-        let role = role.to_role_cached(ctx);
-        if let Some(role) = role {
-            roles.push(role);
+
+    if let Some(guild) = message.guild(ctx.cache()) {
+        for role in &message.mention_roles {
+            if let Some(role) = guild.roles.get(role) {
+                roles.push(role.clone());
+            }
         }
     }
 
@@ -282,6 +287,7 @@ async fn process_message<Data>(
         serde_json::to_value(channel_names).context("serializing channel mentions")?;
     json_obj["stickers::processed"] =
         serde_json::to_value(stickers).context("serializing used stickers")?;
+    json_obj["author_avatar::processed"] = avatar.into();
     json_string += &serde_json::to_string(&json_obj).context("stringifying json")?;
     state
         .file
@@ -309,7 +315,7 @@ pub struct ArchiveData {
 }
 
 pub async fn archive_messages<
-    Data,
+    Data: Send + Sync,
     Messages: Stream<Item = Result<Message>> + Send,
     Reporter: Fn(String) -> ReportResult,
     ReportResult: Future<Output = Result<()>>,

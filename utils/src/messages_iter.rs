@@ -17,8 +17,10 @@ impl MessagesRange {
             return Ok(*self);
         }
 
+        let http = http.as_ref();
+
         let last_msg = channel
-            .messages(http, |b| b.limit(1))
+            .messages(http, GetMessages::new().limit(1))
             .await?
             .first()
             .map(|e| e.id);
@@ -79,21 +81,20 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
         // Number of messages to fetch.
         let grab_size = 100;
 
+        let get = if let Some(before) = self.before {
+            GetMessages::new().before(before)
+        } else {
+            match self.range.after {
+                None => GetMessages::new().limit(grab_size),
+                Some(after) => GetMessages::new().limit(grab_size).after(after),
+            }
+        };
+
+        let http = self.http.as_ref();
+
         // If `self.before` is not set yet, we can use `.messages` to fetch
         // the last message after very first fetch from last.
-        self.buffer = self
-            .channel_id
-            .messages(&self.http, |b| {
-                if let Some(before) = self.before {
-                    b.before(before);
-                }
-
-                match self.range.after {
-                    None => b.limit(grab_size),
-                    Some(after) => b.limit(grab_size).after(after),
-                }
-            })
-            .await?;
+        self.buffer = self.channel_id.messages(http, get).await?;
 
         self.buffer.reverse();
 
