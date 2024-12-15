@@ -24,18 +24,19 @@
       } {
         packages = build-deps ++ [
           toolchain
-          pkgs.rust-analyzer-unwrapped
           pkgs.cargo-bloat
           pkgs.cargo-chef
           pkgs.cargo-deny
           pkgs.cargo-depgraph
           pkgs.cargo-limit
           pkgs.cargo-machete
+          pkgs.cargo-release
           pkgs.cargo-sort
           pkgs.cargo-unused-features
           pkgs.cargo-watch
           pkgs.nodejs_18
           pkgs.pre-commit
+          pkgs.rust-analyzer-unwrapped
         ];
 
         shellHook = ''

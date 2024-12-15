@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["archival", "eh_bot", "utils", "wiper"]
+default-members = ["eh_bot"]
 
 [workspace.dependencies]
 anyhow = "1.0"
@@ -29,3 +30,6 @@ zip = "2.2.1"
 opt-level = 3
 lto = true
 codegen-units = 1
+
+[workspace.metadata.release]
+publish = false
