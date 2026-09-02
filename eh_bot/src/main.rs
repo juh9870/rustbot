@@ -45,10 +45,7 @@ async fn main() {
             },
             ..Default::default()
         })
-        .setup(|_ctx, _ready, _framework| {
-            // poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-            Box::pin(async move { Ok(Data {}) })
-        })
+        .setup(|_ctx, _ready, _framework| Box::pin(async move { Ok(Data {}) }))
         .build();
 
     let client = ClientBuilder::new(token, intents)

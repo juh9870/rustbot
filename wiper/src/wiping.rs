@@ -1,7 +1,7 @@
 use anyhow::Result;
 use chrono::Days;
 use futures::{Stream, StreamExt};
-use poise::serenity_prelude::{Message, Timestamp};
+use poise::serenity_prelude::{ChannelId, Message, Timestamp};
 use std::future::Future;
 use std::time::Duration;
 use utils::reporter::{CountingReporter, Reporter, SimpleReporter};
@@ -13,6 +13,7 @@ pub async fn wipe_messages<
     Data: Send + Sync,
 >(
     ctx: poise::Context<'_, Data, anyhow::Error>,
+    channel: ChannelId,
     messages: Messages,
     report: Reporter,
 ) -> Result<()> {
@@ -45,7 +46,7 @@ pub async fn wipe_messages<
         .await?;
 
     for messages in initial_bulk.chunks(100) {
-        ctx.channel_id().delete_messages(ctx, messages).await?;
+        channel.delete_messages(ctx, messages).await?;
     }
 
     reporter.report("Deleting old messages".to_string()).await?;
