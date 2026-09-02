@@ -31,7 +31,7 @@ macro_rules! archive_command {
         )]
         async fn $name(
             ctx: poise::Context<'_, $data, anyhow::Error>,
-            #[description = "Name of the archive"] archive_name: String,
+            #[description = "Name of the archive. If user ID is used as a name, it will auto-format with user tag and ID"] archive_name: String,
             #[description = "Channel which to archive"] channel: Option<
                 poise::serenity_prelude::ChannelId,
             >,
