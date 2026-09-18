@@ -104,6 +104,10 @@ async fn handle_archive<T: Sync + Send>(
         return Ok(());
     }
 
+    let range_in_channel = messages_range
+        .snapshot_for_channel(ctx, target_channel.id)
+        .await?;
+
     let mut reply = ctx
         .say(format!(
             "Are you sure you want to archive channel {}?",
@@ -146,7 +150,7 @@ async fn handle_archive<T: Sync + Send>(
 
     let ArchiveData { file, time_range } = archive_messages(
         ctx,
-        smart_messages_iter(ctx, target_channel.id, messages_range).map_err(|e| e.into()),
+        smart_messages_iter(ctx, range_in_channel).map_err(|e| e.into()),
         |status| async {
             interaction_channel
                 .edit_message(ctx, response_id, status.into_edit())
@@ -232,7 +236,7 @@ async fn handle_archive<T: Sync + Send>(
         wipe_messages(
             ctx,
             target_channel.id,
-            smart_messages_iter(ctx, target_channel.id, messages_range).map_err(|e| e.into()),
+            smart_messages_iter(ctx, range_in_channel).map_err(|e| e.into()),
             |status, is_due| async move {
                 if is_due {
                     interaction_channel

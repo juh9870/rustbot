@@ -1,3 +1,4 @@
+use anyhow::Context;
 use futures::Stream;
 use poise::serenity_prelude::*;
 
@@ -6,29 +7,35 @@ pub struct MessagesRange {
     pub before: Option<MessageId>,
     pub after: Option<MessageId>,
 }
-
 impl MessagesRange {
     pub async fn snapshot_for_channel<H: AsRef<Http>>(
         &self,
         http: H,
-        channel: ChannelId,
-    ) -> anyhow::Result<MessagesRange> {
-        if self.before.is_some() {
-            return Ok(*self);
-        }
+        channel_id: ChannelId,
+    ) -> anyhow::Result<MessageRangeInChannel> {
+        let before = if let Some(before) = self.before {
+            let msg = channel_id.message(http.as_ref(), before).await.context("Failed to fetch the message specified in `before`. Does it belong to the specified channel?")?;
+            Some((msg.id, msg.timestamp))
+        } else {
+            // find the last message in the channel to use as the `before` value
+            channel_id
+                .messages(http.as_ref(), GetMessages::new().limit(1))
+                .await?
+                .first()
+                .map(|e| (e.id, e.timestamp))
+        };
+        let after = if let Some(after) = self.after {
+            let msg = channel_id.message(http.as_ref(), after).await.context("Failed to fetch the message specified in `after`. Does it belong to the specified channel?")?;
+            Some((msg.id, msg.timestamp))
+        } else {
+            None
+        };
 
-        let http = http.as_ref();
-
-        let last_msg = channel
-            .messages(http, GetMessages::new().limit(1))
-            .await?
-            .first()
-            .map(|e| e.id);
-        let mut cloned = *self;
-
-        cloned.before = last_msg;
-
-        Ok(cloned)
+        Ok(MessageRangeInChannel {
+            channel: channel_id,
+            before,
+            after,
+        })
     }
 
     pub fn unbounded() -> Self {
@@ -39,25 +46,46 @@ impl MessagesRange {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct MessageRangeInChannel {
+    channel: ChannelId,
+    before: Option<(MessageId, Timestamp)>,
+    after: Option<(MessageId, Timestamp)>,
+}
+
+impl MessageRangeInChannel {
+    pub fn channel_id(&self) -> ChannelId {
+        self.channel
+    }
+
+    pub fn before(&self) -> Option<(MessageId, Timestamp)> {
+        self.before
+    }
+
+    pub fn after(&self) -> Option<(MessageId, Timestamp)> {
+        self.after
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct SmartMessagesIter<H: AsRef<Http>> {
     http: H,
-    channel_id: ChannelId,
     buffer: Vec<Message>,
-    before: Option<MessageId>,
+    before: Option<(MessageId, Timestamp)>,
     tried_fetch: bool,
-    range: MessagesRange,
+    range: MessageRangeInChannel,
+    done: bool,
 }
 
 impl<H: AsRef<Http>> SmartMessagesIter<H> {
-    fn new(http: H, channel_id: ChannelId, range: MessagesRange) -> SmartMessagesIter<H> {
+    fn new(http: H, range: MessageRangeInChannel) -> SmartMessagesIter<H> {
         SmartMessagesIter {
             http,
-            channel_id,
             buffer: Vec::new(),
-            before: range.before,
+            before: range.before(),
             tried_fetch: false,
             range,
+            done: false,
         }
     }
 
@@ -74,7 +102,7 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
     /// (or lower) messages sent in the channel are added in the buffer.
     ///
     /// The messages are sorted such that the newest message is the first
-    /// element of the buffer and the newest message is the last.
+    /// element of the buffer and the oldest message is the last.
     ///
     /// [`Message`]: crate::model::channel::Message
     async fn refresh(&mut self) -> Result<()> {
@@ -82,23 +110,33 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
         let grab_size = 100;
 
         let get = if let Some(before) = self.before {
-            GetMessages::new().before(before)
+            GetMessages::new().limit(grab_size).before(before.0)
         } else {
-            match self.range.after {
-                None => GetMessages::new().limit(grab_size),
-                Some(after) => GetMessages::new().limit(grab_size).after(after),
-            }
+            GetMessages::new().limit(grab_size)
         };
 
         let http = self.http.as_ref();
 
         // If `self.before` is not set yet, we can use `.messages` to fetch
         // the last message after very first fetch from last.
-        self.buffer = self.channel_id.messages(http, get).await?;
+        self.buffer = self.range.channel_id().messages(http, get).await?;
+
+        if let Some((after, after_timestamp)) = self.range.after() {
+            if let Some(truncate_at) = self
+                .buffer
+                .iter()
+                .enumerate()
+                .find(|(_, m)| m.id == after || m.timestamp < after_timestamp)
+                .map(|(i, _)| i)
+            {
+                self.buffer.truncate(truncate_at);
+                self.done = true;
+            }
+        }
 
         self.buffer.reverse();
 
-        self.before = self.buffer.first().map(|m| m.id);
+        self.before = self.buffer.first().map(|m| (m.id, m.timestamp));
 
         self.tried_fetch = true;
 
@@ -114,13 +152,14 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
     /// The stream returns the newest message first, followed by older messages.
     pub fn stream(
         http: impl AsRef<Http>,
-        channel_id: ChannelId,
-        range: MessagesRange,
+        range: MessageRangeInChannel,
     ) -> impl Stream<Item = Result<Message>> {
-        let init_state = SmartMessagesIter::new(http, channel_id, range);
+        let init_state = SmartMessagesIter::new(http, range);
 
         futures::stream::unfold(init_state, |mut state| async {
-            if state.buffer.is_empty() && state.before.is_some() || !state.tried_fetch {
+            if !state.done
+                && (state.buffer.is_empty() && state.before.is_some() || !state.tried_fetch)
+            {
                 if let Err(error) = state.refresh().await {
                     return Some((Err(error), state));
                 }
@@ -134,8 +173,7 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
 
 pub fn smart_messages_iter<H: AsRef<Http>>(
     http: H,
-    channel_id: ChannelId,
-    range: MessagesRange,
+    range: MessageRangeInChannel,
 ) -> impl Stream<Item = Result<Message>> {
-    SmartMessagesIter::<H>::stream(http, channel_id, range)
+    SmartMessagesIter::<H>::stream(http, range)
 }
