@@ -9,7 +9,7 @@ use utils::command_handler_wrapper;
 use utils::component_tools::{clear_components, set_dummy_text_component};
 use utils::confirmations::{confirm_buttons, BtnConfirmOptions};
 use utils::into_edit::IntoEdit;
-use utils::messages_iter::{smart_messages_iter, MessagesRange};
+use utils::messages_iter::{smart_messages_iter, MessageRangeInChannel, MessagesRange};
 use utils::web_files::messaged::upload_file_and_message;
 use wiper::wiping::wipe_messages;
 
@@ -65,7 +65,7 @@ pub async fn archive<T: Sync + Send>(
 
 async fn handle_archive<T: Sync + Send>(
     ctx: Context<'_, T>,
-    mut messages_range: MessagesRange,
+    messages_range: MessagesRange,
     target_channel: ChannelId,
     mut archive_name: String,
 ) -> Result<()> {
@@ -104,9 +104,14 @@ async fn handle_archive<T: Sync + Send>(
         return Ok(());
     }
 
-    let range_in_channel = messages_range
-        .snapshot_for_channel(ctx, target_channel.id)
-        .await?;
+    let mut messages_range =
+        match MessageRangeInChannel::new(ctx, messages_range, target_channel.id).await {
+            Ok(r) => r,
+            Err(err) => {
+                ctx.say(format!("{}", err)).await?;
+                return Ok(());
+            }
+        };
 
     let mut reply = ctx
         .say(format!(
@@ -131,12 +136,13 @@ async fn handle_archive<T: Sync + Send>(
     .await?
     .bool();
 
-    if messages_range.before.is_none() {
-        if let Context::Prefix(ctx) = ctx {
-            messages_range.before = Some(ctx.msg.id);
+    if messages_range.before().is_none() && target_channel.id == ctx.channel_id() {
+        let before = if let Context::Prefix(ctx) = ctx {
+            ctx.msg.id
         } else {
-            messages_range.before = Some(reply.id);
-        }
+            reply.id
+        };
+        messages_range.set_before(ctx, before).await?;
     }
 
     clear_components(ctx, &mut reply).await?;
@@ -150,7 +156,7 @@ async fn handle_archive<T: Sync + Send>(
 
     let ArchiveData { file, time_range } = archive_messages(
         ctx,
-        smart_messages_iter(ctx, range_in_channel).map_err(|e| e.into()),
+        smart_messages_iter(ctx, messages_range).map_err(|e| e.into()),
         |status| async {
             interaction_channel
                 .edit_message(ctx, response_id, status.into_edit())
@@ -236,7 +242,7 @@ async fn handle_archive<T: Sync + Send>(
         wipe_messages(
             ctx,
             target_channel.id,
-            smart_messages_iter(ctx, range_in_channel).map_err(|e| e.into()),
+            smart_messages_iter(ctx, messages_range).map_err(|e| e.into()),
             |status, is_due| async move {
                 if is_due {
                     interaction_channel

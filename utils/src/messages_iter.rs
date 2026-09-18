@@ -8,36 +8,6 @@ pub struct MessagesRange {
     pub after: Option<MessageId>,
 }
 impl MessagesRange {
-    pub async fn snapshot_for_channel<H: AsRef<Http>>(
-        &self,
-        http: H,
-        channel_id: ChannelId,
-    ) -> anyhow::Result<MessageRangeInChannel> {
-        let before = if let Some(before) = self.before {
-            let msg = channel_id.message(http.as_ref(), before).await.context("Failed to fetch the message specified in `before`. Does it belong to the specified channel?")?;
-            Some((msg.id, msg.timestamp))
-        } else {
-            // find the last message in the channel to use as the `before` value
-            channel_id
-                .messages(http.as_ref(), GetMessages::new().limit(1))
-                .await?
-                .first()
-                .map(|e| (e.id, e.timestamp))
-        };
-        let after = if let Some(after) = self.after {
-            let msg = channel_id.message(http.as_ref(), after).await.context("Failed to fetch the message specified in `after`. Does it belong to the specified channel?")?;
-            Some((msg.id, msg.timestamp))
-        } else {
-            None
-        };
-
-        Ok(MessageRangeInChannel {
-            channel: channel_id,
-            before,
-            after,
-        })
-    }
-
     pub fn unbounded() -> Self {
         Self {
             before: None,
@@ -54,6 +24,26 @@ pub struct MessageRangeInChannel {
 }
 
 impl MessageRangeInChannel {
+    pub async fn new<H: AsRef<Http>>(
+        http: H,
+        range: MessagesRange,
+        channel_id: ChannelId,
+    ) -> anyhow::Result<MessageRangeInChannel> {
+        let mut channel_range = MessageRangeInChannel {
+            channel: channel_id,
+            before: None,
+            after: None,
+        };
+
+        if let Some(before_id) = range.before {
+            channel_range.set_before(http.as_ref(), before_id).await?;
+        }
+        if let Some(after_id) = range.after {
+            channel_range.set_after(http.as_ref(), after_id).await?;
+        }
+
+        Ok(channel_range)
+    }
     pub fn channel_id(&self) -> ChannelId {
         self.channel
     }
@@ -64,6 +54,28 @@ impl MessageRangeInChannel {
 
     pub fn after(&self) -> Option<(MessageId, Timestamp)> {
         self.after
+    }
+
+    pub async fn set_before<H: AsRef<Http>>(
+        &mut self,
+        http: H,
+        before: MessageId,
+    ) -> anyhow::Result<()> {
+        let msg = self.channel.message(http.as_ref(), before).await.with_context(||format!("Failed to find the message `{}` specified in `before`. Does it belong to channel <#{}>?", before, self.channel))?;
+        self.before = Some((msg.id, msg.timestamp));
+
+        Ok(())
+    }
+
+    pub async fn set_after<H: AsRef<Http>>(
+        &mut self,
+        http: H,
+        after: MessageId,
+    ) -> anyhow::Result<()> {
+        let msg = self.channel.message(http.as_ref(), after).await.with_context(||format!("Failed to find the message `{}` specified in `after`. Does it belong to channel <#{}>?", after, self.channel))?;
+        self.after = Some((msg.id, msg.timestamp));
+
+        Ok(())
     }
 }
 
