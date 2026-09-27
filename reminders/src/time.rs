@@ -61,11 +61,11 @@ fn parse_ts_inner(ts: &str) -> Result<TimeDelta, String> {
         return Err("Can't set reminder for over a year into the future".to_string());
     }
     // truncate to a minute
-    // let delta = TimeDelta::new(delta.num_seconds() / 60 * 60, 0)
-    //     .ok_or_else(|| "duration out of range".to_string())?;
-    // if delta.num_minutes() < 1 {
-    //     return Err("Can't set reminder for under a minute into the future".to_string());
-    // };
+    let delta = TimeDelta::new(delta.num_seconds() / 60 * 60, 0)
+        .ok_or_else(|| "duration out of range".to_string())?;
+    if delta.num_minutes() < 1 {
+        return Err("Can't set reminder for under a minute into the future".to_string());
+    };
 
     Ok(delta)
 }

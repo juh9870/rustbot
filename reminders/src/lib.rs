@@ -64,7 +64,7 @@ pub async fn run_loop(
 ) -> rootcause::Result<()> {
     scheduler
         .add(
-            Job::new_repeated_async(Duration::from_secs(5), move |_, _| {
+            Job::new_repeated_async(Duration::from_secs(30), move |_, _| {
                 let cl = client.clone();
                 let res = resources.clone();
                 Box::pin(async move {
