@@ -17,6 +17,7 @@ use wiper::wiping::wipe_messages;
 
 pub mod archival;
 
+/// Creates a rendered archive of the current (selected) channel, and optionally wipes it
 #[poise::command(
     rename = "archive",
     slash_command,

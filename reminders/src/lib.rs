@@ -19,10 +19,11 @@ use utils::poise_data::{PoiseContext, PoiseResources};
 
 pub mod time;
 
+/// Creates a reminder for bot to ping you with after a delay
 #[poise::command(rename = "remind", slash_command, prefix_command, guild_only)]
 pub async fn remind_command(
     ctx: PoiseContext<'_>,
-    #[description = "Timestamp at which to remind"]
+    #[description = "Time after which to remind. Examples: `5 minutes`, `in an hour`, `1d 16h 35m`"]
     #[autocomplete = "parse_timestamp"]
     #[string]
     timestamp: ChronoTimestampArg,

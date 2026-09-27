@@ -9,6 +9,7 @@ archival = { path = "../archival" }
 camino = { workspace = true }
 chrono = { workspace = true }
 fs-err = { workspace = true }
+indexmap = "2.14.2"
 poise = { workspace = true }
 reminders = { path = "../reminders" }
 rootcause = { workspace = true }

@@ -14,27 +14,29 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 use utils::poise_data::{PoiseContext, PoiseResources};
 
+mod help;
+
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 async fn register(ctx: PoiseContext<'_>) -> rootcause::Result<()> {
     poise::builtins::register_application_commands_buttons(ctx).await?;
     Ok(())
 }
 
-// /// Help command
-// #[poise::command(prefix_command, track_edits, slash_command)]
-// pub async fn help(
-//     ctx: PoiseContext<'_>,
-//     #[description = "Specific command to show help about"] command: Option<String>,
-// ) -> rootcause::Result<()> {
-//     let config = poise::builtins::HelpConfiguration {
-//         extra_text_at_bottom: "\
-// Type /help command for more info on a command.",
-//         ..Default::default()
-//     };
-//     poise::builtins::help(ctx, command.as_deref(), config).await?;
-//
-//     Ok(())
-// }
+/// Help command
+#[poise::command(prefix_command, track_edits, slash_command)]
+pub async fn help(
+    ctx: PoiseContext<'_>,
+    #[description = "Specific command to show help about"] command: Option<String>,
+) -> rootcause::Result<()> {
+    let config = help::HelpConfiguration {
+        extra_text_at_bottom: "\
+Type /help command for more info on a command.",
+        ..Default::default()
+    };
+    help::help(ctx, command.as_deref(), config).await?;
+
+    Ok(())
+}
 
 #[tokio::main]
 async fn main() {
@@ -76,7 +78,7 @@ async fn main_inner() -> rootcause::Result<()> {
     let framework_res = resources.clone();
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![register(), archive_command(), remind_command()],
+            commands: vec![register(), archive_command(), remind_command(), help()],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some(Cow::Borrowed("dh!")),
                 ..Default::default()
