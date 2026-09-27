@@ -1,8 +1,8 @@
-use anyhow::Result;
 use futures::StreamExt;
 use poise::serenity_prelude::{
     ButtonStyle, ComponentInteractionCollector, CreateButton, CreateInteractionResponse, Message,
 };
+use rootcause::Result;
 
 use crate::into_edit::IntoEdit;
 use std::time::Duration;
@@ -54,7 +54,7 @@ impl From<bool> for ConfirmationResult {
 }
 
 pub async fn confirm_buttons<T: Send + Sync>(
-    ctx: poise::Context<'_, T, anyhow::Error>,
+    ctx: poise::Context<'_, T, rootcause::Report>,
     message: &mut Message,
     options: BtnConfirmOptions,
 ) -> Result<ConfirmationResult> {

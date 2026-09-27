@@ -1,4 +1,3 @@
-use anyhow::Result;
 use chrono::Days;
 use futures::{Stream, StreamExt};
 use poise::serenity_prelude::{ChannelId, Message, Timestamp};
@@ -7,16 +6,16 @@ use std::time::Duration;
 use utils::reporter::{CountingReporter, Reporter, SimpleReporter};
 
 pub async fn wipe_messages<
-    Messages: Stream<Item = Result<Message>> + Send,
+    Messages: Stream<Item = rootcause::Result<Message>> + Send,
     Reporter: Fn(String, bool) -> ReportResult,
-    ReportResult: Future<Output = Result<()>>,
+    ReportResult: Future<Output = rootcause::Result<()>>,
     Data: Send + Sync,
 >(
-    ctx: poise::Context<'_, Data, anyhow::Error>,
+    ctx: poise::Context<'_, Data, rootcause::Report>,
     channel: ChannelId,
     messages: Messages,
     report: Reporter,
-) -> Result<()> {
+) -> rootcause::Result<()> {
     let two_weeks_ago = Timestamp::from(
         Timestamp::now()
             .checked_sub_days(Days::new(13))

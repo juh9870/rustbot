@@ -1,6 +1,6 @@
-use anyhow::Context;
 use futures::Stream;
 use poise::serenity_prelude::*;
+use rootcause::prelude::ResultExt;
 
 #[derive(Copy, Clone, Debug)]
 pub struct MessagesRange {
@@ -28,7 +28,7 @@ impl MessageRangeInChannel {
         http: H,
         range: MessagesRange,
         channel_id: ChannelId,
-    ) -> anyhow::Result<MessageRangeInChannel> {
+    ) -> rootcause::Result<MessageRangeInChannel> {
         let mut channel_range = MessageRangeInChannel {
             channel: channel_id,
             before: None,
@@ -60,8 +60,8 @@ impl MessageRangeInChannel {
         &mut self,
         http: H,
         before: MessageId,
-    ) -> anyhow::Result<()> {
-        let msg = self.channel.message(http.as_ref(), before).await.with_context(||format!("Failed to find the message `{}` specified in `before`. Does it belong to channel <#{}>?", before, self.channel))?;
+    ) -> rootcause::Result<()> {
+        let msg = self.channel.message(http.as_ref(), before).await.context_with(||format!("Failed to find the message `{}` specified in `before`. Does it belong to channel <#{}>?", before, self.channel))?;
         self.before = Some((msg.id, msg.timestamp));
 
         Ok(())
@@ -71,8 +71,8 @@ impl MessageRangeInChannel {
         &mut self,
         http: H,
         after: MessageId,
-    ) -> anyhow::Result<()> {
-        let msg = self.channel.message(http.as_ref(), after).await.with_context(||format!("Failed to find the message `{}` specified in `after`. Does it belong to channel <#{}>?", after, self.channel))?;
+    ) -> rootcause::Result<()> {
+        let msg = self.channel.message(http.as_ref(), after).await.context_with(||format!("Failed to find the message `{}` specified in `after`. Does it belong to channel <#{}>?", after, self.channel))?;
         self.after = Some((msg.id, msg.timestamp));
 
         Ok(())

@@ -1,0 +1,17 @@
+[package]
+name = "reminders"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+camino = { workspace = true }
+chrono = { workspace = true }
+humantime = { workspace = true }
+poise = { workspace = true }
+regex = { workspace = true }
+regex_macro = { path = "../regex_macro" }
+rootcause = { workspace = true }
+sqlx = { workspace = true }
+tokio-cron-scheduler = { workspace = true }
+tracing = { workspace = true }
+utils = { path = "../utils" }

@@ -1,9 +1,9 @@
-use anyhow::Context;
+use rootcause::prelude::ResultExt;
 use std::io::{Read, Write};
 use std::path::Path;
 use walkdir::WalkDir;
 
-pub fn archive_directory(dir: &Path, out_file: &mut std::fs::File) -> anyhow::Result<()> {
+pub fn archive_directory(dir: &Path, out_file: &mut std::fs::File) -> rootcause::Result<()> {
     let options = zip::write::FileOptions::<()>::default().unix_permissions(0o755);
     let mut zip = zip::ZipWriter::new(out_file);
     let mut buffer = Vec::new();
@@ -13,7 +13,7 @@ pub fn archive_directory(dir: &Path, out_file: &mut std::fs::File) -> anyhow::Re
         let name = path
             .strip_prefix(dir)?
             .to_str()
-            .ok_or_else(|| anyhow::anyhow!("Bad file name"))?;
+            .ok_or_else(|| rootcause::report!("Bad file name"))?;
 
         if path.is_file() {
             zip.start_file(name, options)?;

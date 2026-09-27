@@ -1,16 +1,16 @@
-use anyhow::Context;
 use poise::serenity_prelude::{ChannelId, CreateAttachment, CreateMessage, Message};
+use rootcause::prelude::ResultExt;
 use std::fs::File;
 use std::path::Path;
 
 pub async fn upload_file_and_message<T: Sync + Send>(
-    ctx: poise::Context<'_, T, anyhow::Error>,
+    ctx: poise::Context<'_, T, rootcause::Report>,
     channel: ChannelId,
     file: &File,
     path: impl AsRef<Path>,
     filename: String,
     message_prefix: String,
-) -> anyhow::Result<Message> {
+) -> rootcause::Result<Message> {
     let size = file.metadata()?.len();
     // Less than 25 MB limit to be safe
     const SIZE_LIMIT: u64 = 1000 * 1000 * 24;

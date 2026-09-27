@@ -1,9 +1,10 @@
-use anyhow::{anyhow, bail, Context, Result};
 use futures::Stream;
 use futures::StreamExt;
 use poise::serenity_prelude::{
     ChannelId, EmojiId, Message, ReactionType, StickerId, StickerItem, Timestamp, User, UserId,
 };
+use rootcause::prelude::ResultExt;
+use rootcause::{bail, report, Result};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
@@ -62,7 +63,7 @@ fn get_extension_from_url(file_url: &str) -> Result<String> {
     Path::extension(parsed.path().as_ref())
         .and_then(|e| e.to_str())
         .map(|e| e.to_string())
-        .ok_or_else(|| anyhow!("Missing file extension"))
+        .ok_or_else(|| report!("Missing file extension"))
 }
 
 async fn ensure_user_avatar(state: &mut ArchivalState, user: &mut User) -> Result<String> {
@@ -83,12 +84,12 @@ async fn ensure_user_avatar(state: &mut ArchivalState, user: &mut User) -> Resul
     // user.avatar = Some(
     //     avatar
     //         .to_str()
-    //         .ok_or_else(|| anyhow!("Failed to stringify avatar url"))?
+    //         .ok_or_else(|| report!("Failed to stringify avatar url"))?
     //         .to_string(),
     // );
     Ok(avatar
         .to_str()
-        .ok_or_else(|| anyhow!("Failed to stringify avatar url"))?
+        .ok_or_else(|| report!("Failed to stringify avatar url"))?
         .to_string())
 }
 
@@ -99,7 +100,7 @@ async fn ensure_sticker<'a>(
     if let std::collections::hash_map::Entry::Vacant(e) = state.stickers.entry(sticker.id) {
         let image_url = sticker
             .image_url()
-            .ok_or_else(|| anyhow!("Sticker image URL missing"))?;
+            .ok_or_else(|| report!("Sticker image URL missing"))?;
         println!("Sticker: {image_url}");
         let extension = get_extension_from_url(&image_url)?;
         let file_path = state.assets_dir.join(format!("{}.{extension}", sticker.id));
@@ -140,7 +141,7 @@ async fn ensure_emoji<'a>(
                         "{}.png",
                         asset
                             .label
-                            .ok_or_else(|| anyhow!("Failed to get emoji label"))?
+                            .ok_or_else(|| report!("Failed to get emoji label"))?
                     ));
                     File::create(&file_name)
                         .await?
@@ -173,7 +174,7 @@ struct ReactionStore {
 }
 
 async fn process_message<Data: Send + Sync>(
-    ctx: poise::Context<'_, Data, anyhow::Error>,
+    ctx: poise::Context<'_, Data, rootcause::Report>,
     state: &mut ArchivalState,
     message: &mut Message,
 ) -> Result<()> {
@@ -192,7 +193,7 @@ async fn process_message<Data: Send + Sync>(
                 attachment.url = file_path
                     .strip_prefix(root_dir_path)?
                     .to_str()
-                    .ok_or_else(|| anyhow!("Bad file path"))?
+                    .ok_or_else(|| report!("Bad file path"))?
                     .to_string();
                 Result::<()>::Ok(())
             }),
@@ -206,7 +207,7 @@ async fn process_message<Data: Send + Sync>(
     for sticker in &message.sticker_items {
         let path = ensure_sticker(state, sticker)
             .await
-            .with_context(|| format!("Fetching sticker {}", sticker.id))?;
+            .context_with(|| format!("Fetching sticker {}", sticker.id))?;
         stickers.push((sticker.id, path.to_owned()));
     }
     let stickers = stickers.into_iter().collect::<FxHashMap<_, _>>();
@@ -219,7 +220,7 @@ async fn process_message<Data: Send + Sync>(
     for reaction in &message.reactions {
         let path = ensure_emoji(state, &reaction.reaction_type)
             .await
-            .with_context(|| format!("fetching emoji {}", reaction.reaction_type))?;
+            .context_with(|| format!("fetching emoji {}", reaction.reaction_type))?;
         reactions.push(ReactionStore {
             count: reaction.count,
             path: path.to_path_buf(),
@@ -238,7 +239,7 @@ async fn process_message<Data: Send + Sync>(
     {
         ensure_emoji(state, &emoji)
             .await
-            .with_context(|| format!("fetching emoji {}", emoji))?;
+            .context_with(|| format!("fetching emoji {}", emoji))?;
     }
 
     let mut channel_names = vec![];
@@ -320,7 +321,7 @@ pub async fn archive_messages<
     Reporter: Fn(String) -> ReportResult,
     ReportResult: Future<Output = Result<()>>,
 >(
-    ctx: poise::Context<'_, Data, anyhow::Error>,
+    ctx: poise::Context<'_, Data, rootcause::Report>,
     messages: Messages,
     report: Reporter,
 ) -> Result<ArchiveData> {
@@ -345,7 +346,7 @@ pub async fn archive_messages<
         }
         process_message(ctx, &mut state, &mut message)
             .await
-            .with_context(|| format!("processing message {}", message.link()))?;
+            .context_with(|| format!("processing message {}", message.link()))?;
     }
 
     state.finalize().await?;

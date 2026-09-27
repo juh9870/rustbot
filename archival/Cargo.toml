@@ -5,10 +5,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = { workspace = true }
 futures = { workspace = true }
 lazy-regex = { workspace = true }
 poise = { workspace = true }
+rootcause = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

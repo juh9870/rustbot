@@ -1,5 +1,5 @@
-use anyhow::{bail, Context};
 use poise::serenity_prelude::Timestamp;
+use rootcause::prelude::ResultExt;
 use serde::Deserialize;
 use std::path::Path;
 use tokio::io::AsyncWriteExt;
@@ -20,7 +20,7 @@ pub struct FileIoResponse {
 pub async fn upload_file(
     path: impl AsRef<Path>,
     filename: String,
-) -> anyhow::Result<FileIoResponse> {
+) -> rootcause::Result<FileIoResponse> {
     let content = tokio::fs::read(path.as_ref()).await?;
     let part = reqwest::multipart::Part::bytes(content).file_name(filename);
     let file = reqwest::multipart::Form::new().part("file", part);
@@ -32,24 +32,24 @@ pub async fn upload_file(
 
     let response: FileIoResponse = response.json().await?;
     if !response.success {
-        bail!("Upload resulted in a failure");
+        rootcause::bail!("Upload resulted in a failure");
     }
     Ok(response)
 }
 
-pub async fn download_to_file(url: &str, file: &Path) -> anyhow::Result<()> {
+pub async fn download_to_file(url: &str, file: &Path) -> rootcause::Result<()> {
     let mut retries = 3;
     let bytes = loop {
         let response = reqwest::get(url).await?;
         let bytes = response
             .bytes()
             .await
-            .with_context(|| format!("downloading file at {url}"));
+            .context_with(|| format!("downloading file at {url}"));
         match bytes {
             Ok(bytes) => break bytes,
             Err(err) => {
                 if retries == 0 {
-                    return Err(err);
+                    return Err(err.into());
                 }
                 retries -= 1;
             }

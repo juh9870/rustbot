@@ -1,74 +1,68 @@
 use crate::archival::{archive_messages, ArchiveData};
-use anyhow::Error;
-use anyhow::{Context as AnyhowContext, Result};
 use futures::TryStreamExt;
-use poise::serenity_prelude::{ButtonStyle, Channel, ChannelId, MessageId, Timestamp, UserId};
+use poise::serenity_prelude::{
+    ButtonStyle, Channel, ChannelId, Message, MessageId, Timestamp, UserId,
+};
+use rootcause::prelude::ResultExt;
 use std::time::Duration;
 use tokio::time::sleep;
-use utils::command_handler_wrapper;
 use utils::component_tools::{clear_components, set_dummy_text_component};
 use utils::confirmations::{confirm_buttons, BtnConfirmOptions};
+use utils::error_handle::transform_error;
 use utils::into_edit::IntoEdit;
 use utils::messages_iter::{smart_messages_iter, MessageRangeInChannel, MessagesRange};
+use utils::poise_data::PoiseContext;
 use utils::web_files::messaged::upload_file_and_message;
 use wiper::wiping::wipe_messages;
 
 pub mod archival;
 
-type Context<'a, T> = poise::Context<'a, T, Error>;
-
-#[macro_export]
-macro_rules! archive_command {
-    ($name:ident, $data:ty) => {
-        /// Archive the current channel (optionally wiping it)
-        #[poise::command(
-            slash_command,
-            prefix_command,
-            required_permissions = "MANAGE_MESSAGES",
-            default_member_permissions = "MANAGE_MESSAGES",
-            required_bot_permissions = "MANAGE_MESSAGES|READ_MESSAGE_HISTORY",
-            guild_only
-        )]
-        async fn $name(
-            ctx: poise::Context<'_, $data, anyhow::Error>,
-            #[description = "Name of the archive. If user ID is used as a name, it will auto-format with user tag and ID"] archive_name: String,
-            #[description = "Channel which to archive"] channel: Option<
-                poise::serenity_prelude::ChannelId,
-            >,
-            #[description = "Message ID *before* which to archive (exclusive)"] before: Option<
-                poise::serenity_prelude::MessageId,
-            >,
-            #[description = "Message ID *after* which to archive (exclusive)"] after: Option<
-                poise::serenity_prelude::MessageId,
-            >,
-        ) -> Result<()> {
-            archival::archive(ctx, archive_name, channel, before, after).await
-        }
-    };
+#[poise::command(
+    rename = "archive",
+    slash_command,
+    prefix_command,
+    required_permissions = "MANAGE_MESSAGES",
+    default_member_permissions = "MANAGE_MESSAGES",
+    required_bot_permissions = "MANAGE_MESSAGES|READ_MESSAGE_HISTORY",
+    guild_only
+)]
+pub async fn archive_command(
+    ctx: PoiseContext<'_>,
+    #[description = "Name of the archive. If user ID is used as a name, it will auto-format with user tag and ID"]
+    archive_name: String,
+    #[description = "Channel which to archive"] channel: Option<ChannelId>,
+    #[description = "Message ID *before* which to archive (exclusive)"] before: Option<Message>,
+    #[description = "Message ID *after* which to archive (exclusive)"] after: Option<Message>,
+) -> rootcause::Result<()> {
+    archive(
+        ctx,
+        archive_name,
+        channel,
+        before.map(|m| m.id),
+        after.map(|m| m.id),
+    )
+    .await
 }
 
-pub async fn archive<T: Sync + Send>(
-    ctx: Context<'_, T>,
+async fn archive(
+    ctx: PoiseContext<'_>,
     archive_name: String,
     channel: Option<ChannelId>,
     before: Option<MessageId>,
     after: Option<MessageId>,
-) -> Result<()> {
+) -> rootcause::Result<()> {
     let channel = channel.unwrap_or(ctx.channel_id());
-    command_handler_wrapper!(handle_archive(
-        ctx,
-        MessagesRange { before, after },
-        channel,
-        archive_name
-    ))
+    handle_archive(ctx, MessagesRange { before, after }, channel, archive_name)
+        .await
+        .map_err(transform_error)
 }
 
-async fn handle_archive<T: Sync + Send>(
-    ctx: Context<'_, T>,
+async fn handle_archive(
+    ctx: PoiseContext<'_>,
     messages_range: MessagesRange,
     target_channel: ChannelId,
     mut archive_name: String,
-) -> Result<()> {
+) -> rootcause::Result<()> {
     let interaction_channel = ctx.channel_id();
     let target_channel = target_channel.to_channel(ctx).await?;
     let Channel::Guild(target_channel) = target_channel else {
@@ -86,7 +80,7 @@ async fn handle_archive<T: Sync + Send>(
     let interaction_member = target_channel.guild_id.member(ctx, ctx.author().id).await?;
     let target_channel_perms = {
         let guild = target_channel.guild(ctx.cache()).ok_or_else(|| {
-            anyhow::anyhow!(
+            rootcause::report!(
                 "Failed to get guild from cache for channel {}",
                 target_channel.id
             )
@@ -137,7 +131,7 @@ async fn handle_archive<T: Sync + Send>(
     .bool();
 
     if messages_range.before().is_none() && target_channel.id == ctx.channel_id() {
-        let before = if let Context::Prefix(ctx) = ctx {
+        let before = if let PoiseContext::Prefix(ctx) = ctx {
             ctx.msg.id
         } else {
             reply.id

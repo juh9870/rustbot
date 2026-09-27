@@ -2,9 +2,9 @@ use crate::into_edit::IntoEdit;
 use poise::serenity_prelude::{CreateButton, EditMessage, Message};
 
 pub async fn clear_components<T: Send + Sync>(
-    ctx: poise::Context<'_, T, anyhow::Error>,
+    ctx: poise::Context<'_, T, rootcause::Report>,
     message: &mut Message,
-) -> anyhow::Result<()> {
+) -> rootcause::Result<()> {
     message
         .edit(ctx, EditMessage::new().components(vec![]))
         .await?;
@@ -12,10 +12,10 @@ pub async fn clear_components<T: Send + Sync>(
 }
 
 pub async fn set_dummy_text_component<T: Send + Sync>(
-    ctx: poise::Context<'_, T, anyhow::Error>,
+    ctx: poise::Context<'_, T, rootcause::Report>,
     message: &mut Message,
     text: impl Into<String>,
-) -> anyhow::Result<()> {
+) -> rootcause::Result<()> {
     message
         .edit(
             ctx,

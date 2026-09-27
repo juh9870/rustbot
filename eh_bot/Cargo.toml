@@ -5,7 +5,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = { workspace = true }
 archival = { path = "../archival" }
+camino = { workspace = true }
+chrono = { workspace = true }
+fs-err = { workspace = true }
 poise = { workspace = true }
+reminders = { path = "../reminders" }
+rootcause = { workspace = true }
+rootcause-tracing = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
+tokio-cron-scheduler = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+utils = { path = "../utils" }

@@ -2,3 +2,5 @@
 .idea
 node_modules
 dist
+dev/reminders.db
+.env
