@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n    INSERT INTO reminders (message, author_id, channel_id, reminder_unix_ts) VALUES (?, ?, ?, ?);\n    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "48355dbf2f9fddb56d113228717616132bd6d2a39b4e0a735452e7c7a93e81e6"
+}
