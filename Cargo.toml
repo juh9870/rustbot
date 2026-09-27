@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["archival", "eh_bot", "regex_macro", "reminders", "utils", "wiper"]
+members = ["archival", "eh_bot", "help", "regex_macro", "reminders", "utils", "wiper"]
 default-members = ["eh_bot"]
 
 [workspace.dependencies]
@@ -11,6 +11,7 @@ fs-err = "3.3.1"
 futures = "0.3"
 fuzzydate = "0.4.1"
 humantime = "2.4.0"
+indexmap = "2.14.2"
 itertools = "0.15.0"
 lazy-regex = "3"
 npm_rs = "1.0.0"

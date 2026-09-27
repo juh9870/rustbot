@@ -1,6 +1,6 @@
 //! Contains the built-in help command and surrounding infrastructure
 #![allow(clippy::result_large_err)]
-use poise::{serenity_prelude as serenity, Command, CreateReply};
+use poise::{Command, CreateReply, serenity_prelude as serenity};
 use std::{borrow::Cow, fmt::Write as _};
 
 /// Optional configuration for how the help message from [`help()`] looks
@@ -85,9 +85,7 @@ impl TwoColumnList {
 }
 
 /// Get the prefix from options
-pub(super) async fn get_prefix_from_options<U, E>(
-    ctx: poise::Context<'_, U, E>,
-) -> Option<Cow<'static, str>> {
+async fn get_prefix_from_options<U, E>(ctx: poise::Context<'_, U, E>) -> Option<Cow<'static, str>> {
     let options = &ctx.framework().options().prefix_options;
     match &options.prefix {
         Some(fixed_prefix) => Some(fixed_prefix.clone()),

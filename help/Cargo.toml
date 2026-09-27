@@ -1,0 +1,8 @@
+[package]
+name = "help"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+indexmap = { workspace = true }
+poise = { workspace = true }

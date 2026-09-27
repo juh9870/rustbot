@@ -14,8 +14,6 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 use utils::poise_data::{PoiseContext, PoiseResources};
 
-mod help;
-
 #[poise::command(prefix_command, owners_only, hide_in_help)]
 async fn register(ctx: PoiseContext<'_>) -> rootcause::Result<()> {
     poise::builtins::register_application_commands_buttons(ctx).await?;
