@@ -1,3 +1,5 @@
+.ONESHELL:
+
 .PHONY: fix
 fix:
 	cargo lfix --allow-dirty --allow-staged -q --all-features
@@ -8,8 +10,12 @@ fix:
 .PHONY: migrate
 migrate:
 	cargo sqlx migrate run
+	cd message_finder
+	cargo sqlx migrate run
 
 
 .PHONY: prepare
 prepare:
 	cargo sqlx prepare --workspace
+	cd message_finder
+	cargo sqlx prepare

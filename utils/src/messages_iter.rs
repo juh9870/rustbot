@@ -1,6 +1,9 @@
 use futures::Stream;
+use futures::StreamExt;
 use poise::serenity_prelude::*;
 use rootcause::prelude::ResultExt;
+
+pub mod resume;
 
 #[derive(Copy, Clone, Debug)]
 pub struct MessagesRange {
@@ -24,12 +27,12 @@ pub struct MessageRangeInChannel {
 }
 
 impl MessageRangeInChannel {
-    pub async fn new<H: AsRef<Http>>(
-        http: H,
+    pub async fn new(
+        http: impl AsRef<Http>,
         range: MessagesRange,
         channel_id: ChannelId,
-    ) -> rootcause::Result<MessageRangeInChannel> {
-        let mut channel_range = MessageRangeInChannel {
+    ) -> rootcause::Result<Self> {
+        let mut channel_range = Self {
             channel: channel_id,
             before: None,
             after: None,
@@ -44,6 +47,14 @@ impl MessageRangeInChannel {
 
         Ok(channel_range)
     }
+    pub fn new_full(channel_id: ChannelId) -> Self {
+        Self {
+            before: None,
+            after: None,
+            channel: channel_id,
+        }
+    }
+
     pub fn channel_id(&self) -> ChannelId {
         self.channel
     }
@@ -61,7 +72,7 @@ impl MessageRangeInChannel {
         http: H,
         before: MessageId,
     ) -> rootcause::Result<()> {
-        let msg = self.channel.message(http.as_ref(), before).await.context_with(||format!("Failed to find the message `{}` specified in `before`. Does it belong to channel <#{}>?", before, self.channel))?;
+        let msg = self.channel.message(http.as_ref(), before).await.context_with(|| format!("Failed to find the message `{}` specified in `before`. Does it belong to channel <#{}>?", before, self.channel))?;
         self.before = Some((msg.id, msg.timestamp));
 
         Ok(())
@@ -72,7 +83,7 @@ impl MessageRangeInChannel {
         http: H,
         after: MessageId,
     ) -> rootcause::Result<()> {
-        let msg = self.channel.message(http.as_ref(), after).await.context_with(||format!("Failed to find the message `{}` specified in `after`. Does it belong to channel <#{}>?", after, self.channel))?;
+        let msg = self.channel.message(http.as_ref(), after).await.context_with(|| format!("Failed to find the message `{}` specified in `after`. Does it belong to channel <#{}>?", after, self.channel))?;
         self.after = Some((msg.id, msg.timestamp));
 
         Ok(())
@@ -80,17 +91,19 @@ impl MessageRangeInChannel {
 }
 
 #[derive(Clone, Debug)]
-pub struct SmartMessagesIter<H: AsRef<Http>> {
+pub struct SmartMessagesIter<H: AsRef<Http>, R: Resume> {
     http: H,
     buffer: Vec<Message>,
     before: Option<(MessageId, Timestamp)>,
     tried_fetch: bool,
     range: MessageRangeInChannel,
     done: bool,
+    resume: R,
+    resume_fetched: bool,
 }
 
-impl<H: AsRef<Http>> SmartMessagesIter<H> {
-    fn new(http: H, range: MessageRangeInChannel) -> SmartMessagesIter<H> {
+impl<H: AsRef<Http>, R: Resume> SmartMessagesIter<H, R> {
+    fn new(http: H, range: MessageRangeInChannel, resume: R) -> SmartMessagesIter<H, R> {
         SmartMessagesIter {
             http,
             buffer: Vec::new(),
@@ -98,6 +111,8 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
             tried_fetch: false,
             range,
             done: false,
+            resume,
+            resume_fetched: false,
         }
     }
 
@@ -117,9 +132,21 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
     /// element of the buffer and the oldest message is the last.
     ///
     /// [`Message`]: crate::model::channel::Message
-    async fn refresh(&mut self) -> Result<()> {
+    async fn refresh(&mut self) -> rootcause::Result<()> {
         // Number of messages to fetch.
         let grab_size = 100;
+
+        if !self.resume_fetched {
+            match self.resume.resume().await? {
+                ResumeResult::Done => {
+                    self.done = true;
+                    return Ok(());
+                }
+                ResumeResult::Recorded(before) => self.before = Some(before),
+                ResumeResult::NotRecorded => {}
+            }
+            self.resume_fetched = true;
+        }
 
         let get = if let Some(before) = self.before {
             GetMessages::new().limit(grab_size).before(before.0)
@@ -149,6 +176,11 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
         self.buffer.reverse();
 
         self.before = self.buffer.first().map(|m| (m.id, m.timestamp));
+        if let Some(before) = self.before {
+            self.resume.record(before).await?;
+        } else {
+            self.resume.mark_done().await?;
+        }
 
         self.tried_fetch = true;
 
@@ -163,10 +195,11 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
     ///
     /// The stream returns the newest message first, followed by older messages.
     pub fn stream(
-        http: impl AsRef<Http>,
+        http: H,
         range: MessageRangeInChannel,
-    ) -> impl Stream<Item = Result<Message>> {
-        let init_state = SmartMessagesIter::new(http, range);
+        resume: R,
+    ) -> impl Stream<Item = rootcause::Result<Message>> {
+        let init_state = Self::new(http, range, resume);
 
         futures::stream::unfold(init_state, |mut state| async {
             if !state.done
@@ -183,9 +216,37 @@ impl<H: AsRef<Http>> SmartMessagesIter<H> {
     }
 }
 
-pub fn smart_messages_iter<H: AsRef<Http>>(
-    http: H,
+pub trait Resume {
+    async fn record(&mut self, before: (MessageId, Timestamp)) -> rootcause::Result<()>;
+    async fn mark_done(&mut self) -> rootcause::Result<()>;
+    async fn resume(&mut self) -> rootcause::Result<ResumeResult>;
+}
+
+impl Resume for () {
+    async fn record(&mut self, before: (MessageId, Timestamp)) -> rootcause::Result<()> {
+        Ok(())
+    }
+
+    async fn mark_done(&mut self) -> rootcause::Result<()> {
+        Ok(())
+    }
+
+    async fn resume(&mut self) -> rootcause::Result<ResumeResult> {
+        Ok(ResumeResult::NotRecorded)
+    }
+}
+
+#[derive(Debug)]
+pub enum ResumeResult {
+    Done,
+    Recorded((MessageId, Timestamp)),
+    NotRecorded,
+}
+
+pub fn smart_messages_iter(
+    http: impl AsRef<Http>,
     range: MessageRangeInChannel,
-) -> impl Stream<Item = Result<Message>> {
-    SmartMessagesIter::<H>::stream(http, range)
+    resume: impl Resume,
+) -> impl Stream<Item = rootcause::Result<Message>> {
+    SmartMessagesIter::stream(http, range, resume)
 }

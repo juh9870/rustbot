@@ -7,10 +7,8 @@ edition = "2021"
 [dependencies]
 archival = { path = "../archival" }
 camino = { workspace = true }
-chrono = { workspace = true }
 fs-err = { workspace = true }
 help = { path = "../help" }
-indexmap = "2.14.2"
 poise = { workspace = true }
 reminders = { path = "../reminders" }
 rootcause = { workspace = true }

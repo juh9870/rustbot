@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO messages (message_id, channel_id, guild_id, timestamp, content, attachments_count) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "8b413e42e721ebed3ff632720c5ade6e0677629a98c05b21532dbd499d6be481"
+}

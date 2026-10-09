@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                UPDATE messages SET deleted = 1 where message_id = ?;\n                DELETE FROM deletion_priority where message_id = ?;\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "85e6ed08c50012251522fbb0e40996775594cf2535de25066dbc444d15c2c26b"
+}

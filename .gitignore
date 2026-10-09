@@ -2,5 +2,6 @@
 .idea
 node_modules
 dist
-dev/reminders.db
+dev/*
+!dev/.gitkeep
 .env

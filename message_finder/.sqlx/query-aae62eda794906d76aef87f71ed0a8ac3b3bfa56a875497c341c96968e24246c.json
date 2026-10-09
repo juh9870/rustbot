@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO progress (channel_id, done) VALUES (?, 1) ON CONFLICT DO UPDATE SET done = EXCLUDED.done",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "aae62eda794906d76aef87f71ed0a8ac3b3bfa56a875497c341c96968e24246c"
+}

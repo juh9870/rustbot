@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT count(*) AS total FROM deletion_priority",
+  "describe": {
+    "columns": [
+      {
+        "name": "total",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "95b5aff9e8a70a740db7db0bd2b33968653a2ebd40fe7584e4ada60eb5a6ee27"
+}

@@ -1,0 +1,2 @@
+[common]
+database-url-var = "MESSAGES_DATABASE_URL"

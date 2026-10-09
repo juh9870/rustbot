@@ -50,7 +50,7 @@ pub async fn init(resources: &mut PoiseResources, data_path: &Utf8Path) -> rootc
         .await
         .context("Failed to connect to reminders database")?;
 
-    migrate!("../migrations").run(&mut conn).await?;
+    migrate!("./migrations").run(&mut conn).await?;
 
     resources.init_resource::<ReminderResource>(ReminderResource { conn });
 

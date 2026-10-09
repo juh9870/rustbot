@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT done, progress, progress_ts FROM progress WHERE channel_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "done",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "progress",
+            "name": "done"
+          }
+        }
+      },
+      {
+        "name": "progress",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "progress",
+            "name": "progress"
+          }
+        }
+      },
+      {
+        "name": "progress_ts",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "progress",
+            "name": "progress_ts"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "b882c4de4c8263957bd39e27e9cff96da3ee0e6c29dd5765163e90db627ca71b"
+}

@@ -1,5 +1,4 @@
 use crate::archival::{archive_messages, ArchiveData};
-use futures::TryStreamExt;
 use poise::serenity_prelude::{
     ButtonStyle, Channel, ChannelId, Message, MessageId, Timestamp, UserId,
 };
@@ -151,7 +150,7 @@ async fn handle_archive(
 
     let ArchiveData { file, time_range } = archive_messages(
         ctx,
-        smart_messages_iter(ctx, messages_range).map_err(|e| e.into()),
+        smart_messages_iter(ctx, messages_range, ()),
         |status| async {
             interaction_channel
                 .edit_message(ctx, response_id, status.into_edit())
@@ -237,7 +236,7 @@ async fn handle_archive(
         wipe_messages(
             ctx,
             target_channel.id,
-            smart_messages_iter(ctx, messages_range).map_err(|e| e.into()),
+            smart_messages_iter(ctx, messages_range, ()),
             |status, is_due| async move {
                 if is_due {
                     interaction_channel
