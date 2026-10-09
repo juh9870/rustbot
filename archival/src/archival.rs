@@ -28,10 +28,12 @@ struct ArchivalState {
     avatars: FxHashMap<UserId, PathBuf>,
     emojis: FxHashMap<ReactionType, PathBuf>,
     stickers: FxHashMap<StickerId, PathBuf>,
+    attachments: AttachmentsPolicy,
+    want_na_file: bool,
 }
 
 impl ArchivalState {
-    async fn create() -> Result<Self> {
+    async fn create(attachments: AttachmentsPolicy) -> Result<Self> {
         let dir = tempdir()?;
         let file = File::create(dir.path().join("messages.jsonp")).await?;
         File::create(dir.path().join("archive.html"))
@@ -49,12 +51,24 @@ impl ArchivalState {
             avatars: Default::default(),
             emojis: Default::default(),
             stickers: Default::default(),
+            attachments,
+            want_na_file: false,
         })
     }
 
     async fn finalize(&mut self) -> Result<()> {
+        if self.want_na_file {
+            File::create(&self.na_image_file_path())
+                .await?
+                .write_all(include_bytes!("attachment_not_included.png"))
+                .await?;
+        }
         self.file.write_all("\n])".as_bytes()).await?;
         Ok(())
+    }
+
+    fn na_image_file_path(&self) -> PathBuf {
+        self.assets_dir.join("attachment_not_included.png")
     }
 }
 
@@ -180,28 +194,43 @@ async fn process_message<Data: Send + Sync>(
 ) -> Result<()> {
     let asset_path = &state.assets_dir;
     let root_dir_path = state.root_dir.path();
-    futures::future::join_all(
-        message
-            .attachments
-            .iter_mut()
-            .map(move |attachment| async move {
-                let filename = format!("{}_{}", attachment.id, attachment.filename);
-                let file_path = asset_path.join(&filename);
-                download_to_file(&attachment.url, &file_path)
-                    .await
-                    .context("Downloading attachment")?;
-                attachment.url = file_path
+
+    match state.attachments {
+        AttachmentsPolicy::Include => {
+            futures::future::join_all(message.attachments.iter_mut().map(
+                move |attachment| async move {
+                    let filename = format!("{}_{}", attachment.id, attachment.filename);
+                    let file_path = asset_path.join(&filename);
+                    download_to_file(&attachment.url, &file_path)
+                        .await
+                        .context("Downloading attachment")?;
+                    attachment.url = file_path
+                        .strip_prefix(root_dir_path)?
+                        .to_str()
+                        .ok_or_else(|| report!("Bad file path"))?
+                        .to_string();
+                    Result::<()>::Ok(())
+                },
+            ))
+            .await
+            .into_iter()
+            .collect::<Result<Vec<()>, _>>()
+            .context("downloading attachments")?;
+        }
+        AttachmentsPolicy::Skip => {
+            if !message.attachments.is_empty() {
+                state.want_na_file = true;
+            }
+            for a in message.attachments.iter_mut() {
+                a.url = state
+                    .na_image_file_path()
                     .strip_prefix(root_dir_path)?
                     .to_str()
-                    .ok_or_else(|| report!("Bad file path"))?
+                    .ok_or_else(|| report!("bad file path"))?
                     .to_string();
-                Result::<()>::Ok(())
-            }),
-    )
-    .await
-    .into_iter()
-    .collect::<Result<Vec<()>, _>>()
-    .context("downloading attachments")?;
+            }
+        }
+    }
 
     let mut stickers = vec![];
     for sticker in &message.sticker_items {
@@ -315,6 +344,12 @@ pub struct ArchiveData {
     pub time_range: Range<Timestamp>,
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum AttachmentsPolicy {
+    Include,
+    Skip,
+}
+
 pub async fn archive_messages<
     Data: Send + Sync,
     Messages: Stream<Item = Result<Message>> + Send,
@@ -324,8 +359,9 @@ pub async fn archive_messages<
     ctx: poise::Context<'_, Data, rootcause::Report>,
     messages: Messages,
     report: Reporter,
+    attachments: AttachmentsPolicy,
 ) -> Result<ArchiveData> {
-    let mut state = ArchivalState::create().await?;
+    let mut state = ArchivalState::create(attachments).await?;
 
     let mut messages = messages.boxed();
     let mut last = Instant::now();

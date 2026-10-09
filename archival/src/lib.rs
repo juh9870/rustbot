@@ -1,7 +1,5 @@
-use crate::archival::{archive_messages, ArchiveData};
-use poise::serenity_prelude::{
-    ButtonStyle, Channel, ChannelId, Message, MessageId, Timestamp, UserId,
-};
+use crate::archival::{archive_messages, ArchiveData, AttachmentsPolicy};
+use poise::serenity_prelude::{ButtonStyle, Channel, ChannelId, MessageId, Timestamp, UserId};
 use rootcause::prelude::ResultExt;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -31,15 +29,21 @@ pub async fn archive_command(
     #[description = "Name of the archive. If user ID is used as a name, it will auto-format with user tag and ID"]
     archive_name: String,
     #[description = "Channel which to archive"] channel: Option<ChannelId>,
-    #[description = "Message ID *before* which to archive (exclusive)"] before: Option<Message>,
-    #[description = "Message ID *after* which to archive (exclusive)"] after: Option<Message>,
+    #[string]
+    #[description = "Message ID *before* which to archive (exclusive)"]
+    before: Option<MessageId>,
+    #[string]
+    #[description = "Message ID *after* which to archive (exclusive)"]
+    after: Option<MessageId>,
+    #[description = "Whenever to skip downloading any attachments"] skip_attachments: Option<bool>,
 ) -> rootcause::Result<()> {
     archive(
         ctx,
         archive_name,
         channel,
-        before.map(|m| m.id),
-        after.map(|m| m.id),
+        before,
+        after,
+        skip_attachments.unwrap_or(false),
     )
     .await
 }
@@ -50,11 +54,22 @@ async fn archive(
     channel: Option<ChannelId>,
     before: Option<MessageId>,
     after: Option<MessageId>,
+    skip_attachments: bool,
 ) -> rootcause::Result<()> {
     let channel = channel.unwrap_or(ctx.channel_id());
-    handle_archive(ctx, MessagesRange { before, after }, channel, archive_name)
-        .await
-        .map_err(transform_error)
+    handle_archive(
+        ctx,
+        MessagesRange { before, after },
+        channel,
+        archive_name,
+        if skip_attachments {
+            AttachmentsPolicy::Skip
+        } else {
+            AttachmentsPolicy::Include
+        },
+    )
+    .await
+    .map_err(transform_error)
 }
 
 async fn handle_archive(
@@ -62,6 +77,7 @@ async fn handle_archive(
     messages_range: MessagesRange,
     target_channel: ChannelId,
     mut archive_name: String,
+    attachments: AttachmentsPolicy,
 ) -> rootcause::Result<()> {
     let interaction_channel = ctx.channel_id();
     let target_channel = target_channel.to_channel(ctx).await?;
@@ -157,6 +173,7 @@ async fn handle_archive(
                 .await?;
             Ok(())
         },
+        attachments,
     )
     .await?;
 

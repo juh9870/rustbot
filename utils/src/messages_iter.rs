@@ -1,5 +1,4 @@
 use futures::Stream;
-use futures::StreamExt;
 use poise::serenity_prelude::*;
 use rootcause::prelude::ResultExt;
 
@@ -216,6 +215,7 @@ impl<H: AsRef<Http>, R: Resume> SmartMessagesIter<H, R> {
     }
 }
 
+#[allow(async_fn_in_trait)]
 pub trait Resume {
     async fn record(&mut self, before: (MessageId, Timestamp)) -> rootcause::Result<()>;
     async fn mark_done(&mut self) -> rootcause::Result<()>;
@@ -223,7 +223,7 @@ pub trait Resume {
 }
 
 impl Resume for () {
-    async fn record(&mut self, before: (MessageId, Timestamp)) -> rootcause::Result<()> {
+    async fn record(&mut self, _before: (MessageId, Timestamp)) -> rootcause::Result<()> {
         Ok(())
     }
 

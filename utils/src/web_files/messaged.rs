@@ -1,7 +1,9 @@
-use poise::serenity_prelude::{ChannelId, CreateAttachment, CreateMessage, Message};
+use poise::serenity_prelude::{ChannelId, CreateAttachment, CreateMessage, Message, Timestamp};
 use rootcause::prelude::ResultExt;
 use std::fs::File;
+use std::ops::Add;
 use std::path::Path;
+use std::time::Duration;
 
 pub async fn upload_file_and_message<T: Sync + Send>(
     ctx: poise::Context<'_, T, rootcause::Report>,
@@ -27,13 +29,13 @@ pub async fn upload_file_and_message<T: Sync + Send>(
     } else {
         let uploaded = super::upload_file(path, filename)
             .await
-            .context("uploading archive to file.io")?;
+            .context("uploading archive to catbox.moe")?;
 
+        let expires = Timestamp::now().add(Duration::from_hours(1));
         let content = CreateMessage::new().content(format!(
-            "{message_prefix}\nDownload archive at {}\nFile will expire <t:{}:R>, or after {}",
-            uploaded.link,
-            uploaded.expires.unix_timestamp(),
-            pluralizer::pluralize("downloads", uploaded.max_downloads, true)
+            "{message_prefix}\nDownload archive at {}\nFile will expire <t:{}:R>",
+            uploaded,
+            expires.timestamp(),
         ));
 
         channel

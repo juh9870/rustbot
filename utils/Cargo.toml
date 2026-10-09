@@ -13,5 +13,6 @@ reqwest = { workspace = true, features = ["multipart", "json"] }
 rootcause = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = ["fs"] }
+tokio-util = { workspace = true, features = ["io"] }
 walkdir = { workspace = true }
 zip = { workspace = true }
